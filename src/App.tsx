@@ -44,6 +44,9 @@ import {
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 
+type TabId = 'telemetry' | 'risk' | 'map' | 'forecast' | 'locker';
+interface GeoLocation { lat: number; lng: number; }
+
 const mockWeatherData = Array.from({ length: 24 }, (_, i) => ({
   time: `${i}:00`,
   temp: 20 + Math.sin(i / 4) * 10 + Math.random() * 2,
@@ -51,8 +54,40 @@ const mockWeatherData = Array.from({ length: 24 }, (_, i) => ({
   pressure: 1010 + Math.sin(i / 8) * 5 + Math.random(),
 }));
 
-// Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Initialize Gemini API with validation
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.warn('GEMINI_API_KEY is not configured. AI features will be unavailable.');
+}
+const ai = new GoogleGenAI({ apiKey: apiKey ?? '' });
+
+const DEFAULT_LOCATION: GeoLocation = { lat: 37.7749, lng: -122.4194 };
+const DEFAULT_AQI = 42;
+const DEFAULT_TIDE = 1.2;
+const TELEMETRY_REFRESH_INTERVAL_MS = 60_000;
+
+const API_BASE = {
+  weather: 'https://api.open-meteo.com/v1/forecast',
+  airQuality: 'https://air-quality-api.open-meteo.com/v1/air-quality',
+  marine: 'https://marine-api.open-meteo.com/v1/marine',
+} as const;
+
+const TABS: { id: TabId; label: string; icon: typeof Activity }[] = [
+  { id: 'telemetry', label: 'Telemetry', icon: Activity },
+  { id: 'risk', label: 'AI Risk Analysis', icon: AlertTriangle },
+  { id: 'map', label: 'Site Map & Logistics', icon: MapIcon },
+  { id: 'forecast', label: 'Forecast Grounding', icon: CalendarDays },
+  { id: 'locker', label: 'Sharding Locker', icon: Archive },
+];
+
+function TabLoadingFallback() {
+  return (
+    <div className="flex flex-col items-center justify-center h-64 space-y-4">
+      <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
+      <p className="text-slate-400 text-sm animate-pulse">Loading secure telemetry...</p>
+    </div>
+  );
+}
 
 const getMetricStatus = (type: string, value: number) => {
   switch(type) {
@@ -115,7 +150,7 @@ const MetricCard = ({ title, value, unit, icon: Icon, type }: any) => {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'telemetry' | 'risk' | 'map' | 'forecast' | 'locker'>('telemetry');
+  const [activeTab, setActiveTab] = useState<TabId>('telemetry');
   
   // Telemetry Source State
   const [telemetrySource, setTelemetrySource] = useState<'onboard' | 'external'>('onboard');
@@ -136,9 +171,9 @@ export default function App() {
     humidity: 45.2,
     pressure: 1012.5,
     precipitation: 15,
-    tide: 1.2,
+    tide: DEFAULT_TIDE,
     uvIndex: 3.5,
-    aqi: 42
+    aqi: DEFAULT_AQI
   });
 
   const currentTelemetry = telemetrySource === 'onboard' ? onboardTelemetry : externalTelemetry;
@@ -152,7 +187,7 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pi Location State
-  const [piLocation, setPiLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [piLocation, setPiLocation] = useState<GeoLocation>(DEFAULT_LOCATION);
 
   // Locker State
   const [lockerEntries, setLockerEntries] = useState<any[]>([]);
@@ -224,7 +259,7 @@ export default function App() {
     setIsFetchingForecast(true);
     try {
       if (telemetrySource === 'external') {
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${piLocation.lat}&longitude=${piLocation.lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,uv_index_max&timezone=auto`);
+        const res = await fetch(`${API_BASE.weather}?latitude=${piLocation.lat}&longitude=${piLocation.lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,uv_index_max&timezone=auto`);
         const data = await res.json();
         if (data && data.daily) {
           const formatted = data.daily.time.map((timeStr: string, i: number) => ({
@@ -320,9 +355,9 @@ export default function App() {
       const { lat, lng: lon } = location;
       
       const [weatherRes, aqiRes, marineRes] = await Promise.all([
-        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,uv_index&hourly=precipitation_probability&timezone=auto`),
-        fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi`),
-        fetch(`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height`)
+        fetch(`${API_BASE.weather}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,uv_index&hourly=precipitation_probability&timezone=auto`),
+        fetch(`${API_BASE.airQuality}?latitude=${lat}&longitude=${lon}&current=us_aqi`),
+        fetch(`${API_BASE.marine}?latitude=${lat}&longitude=${lon}&current=wave_height`)
       ]);
 
       const weather = await weatherRes.json();
@@ -415,7 +450,7 @@ export default function App() {
     let simInterval: any;
     
     const init = async () => {
-      let location = { lat: 37.7749, lng: -122.4194 }; // Default
+      let location = DEFAULT_LOCATION;
       
       try {
         if ('geolocation' in navigator) {
@@ -437,7 +472,7 @@ export default function App() {
         
         interval = setInterval(() => {
           fetchRealTelemetry(location);
-        }, 60000); // Update every minute
+        }, TELEMETRY_REFRESH_INTERVAL_MS); // Update every minute
 
         simInterval = setInterval(() => {
           setOnboardTelemetry(prev => ({
@@ -558,7 +593,7 @@ export default function App() {
       if (source === 'external') {
         const { lat, lng: lon } = location;
         
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&past_days=${days}&hourly=temperature_2m,relative_humidity_2m,surface_pressure,precipitation_probability`);
+        const res = await fetch(`${API_BASE.weather}?latitude=${lat}&longitude=${lon}&past_days=${days}&hourly=temperature_2m,relative_humidity_2m,surface_pressure,precipitation_probability`);
         const data = await res.json();
         
         if (data && data.hourly) {
@@ -881,55 +916,22 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Tab Navigation */}
-        <div className="flex space-x-4 mb-8 border-b border-slate-800 pb-px">
-          <button 
-            onClick={() => setActiveTab('telemetry')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'telemetry' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
-          >
-            <div className="flex items-center">
-              <Activity className="w-4 h-4 mr-2" />
-              Telemetry
-            </div>
-          </button>
-          <button 
-            onClick={() => setActiveTab('risk')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'risk' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
-          >
-            <div className="flex items-center">
-              <AlertTriangle className="w-4 h-4 mr-2" />
-              AI Risk Analysis
-            </div>
-          </button>
-          <button 
-            onClick={() => {
-              setActiveTab('map');
-              if (!mapReport) fetchSiteMapData();
-            }}
-            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'map' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
-          >
-            <div className="flex items-center">
-              <MapIcon className="w-4 h-4 mr-2" />
-              Site Map & Logistics
-            </div>
-          </button>
-          <button 
-            onClick={() => setActiveTab('forecast')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'forecast' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
-          >
-            <div className="flex items-center">
-              <CalendarDays className="w-4 h-4 mr-2" />
-              Forecast Grounding
-            </div>
-          </button>
-          <button 
-            onClick={() => setActiveTab('locker')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'locker' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
-          >
-            <div className="flex items-center">
-              <Archive className="w-4 h-4 mr-2" />
-              Sharding Locker
-            </div>
-          </button>
+        <div className="flex space-x-4 mb-8 border-b border-slate-800 pb-px overflow-x-auto scrollbar-hide">
+          {TABS.map((tab) => (
+            <button 
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id);
+                if (tab.id === 'map' && !mapReport) fetchSiteMapData();
+              }}
+              className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
+            >
+              <div className="flex items-center">
+                <tab.icon className="w-4 h-4 mr-2" />
+                {tab.label}
+              </div>
+            </button>
+          ))}
         </div>
 
         {activeTab === 'telemetry' && (
@@ -1158,7 +1160,7 @@ export default function App() {
                            </div>
                         </div>
                         {att.verified && (
-                          <ShieldCheck className="w-4 h-4 text-emerald-500" title="Minima Verified" />
+                          <ShieldCheck className="w-4 h-4 text-emerald-500" />
                         )}
                       </div>
                     ))}
@@ -1300,10 +1302,7 @@ export default function App() {
               
               <div className="flex-1 overflow-y-auto pr-2">
                 {isAnalyzing ? (
-                  <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-slate-500 space-y-4">
-                    <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-                    <p>Analyzing telemetry and generating directives...</p>
-                  </div>
+                  <TabLoadingFallback />
                 ) : riskReport ? (
                   <div className="prose prose-invert prose-emerald max-w-none">
                     <div className="markdown-body text-sm text-slate-300">
@@ -1410,10 +1409,7 @@ export default function App() {
             </div>
 
             {isFetchingMap ? (
-              <div className="h-64 flex flex-col items-center justify-center text-slate-500 space-y-4">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                <p>Querying Google Maps for local logistics...</p>
-              </div>
+              <TabLoadingFallback />
             ) : mapReport ? (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
@@ -1509,10 +1505,7 @@ export default function App() {
             </div>
 
             {isFetchingForecast ? (
-              <div className="h-64 flex flex-col items-center justify-center text-slate-500 space-y-4">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-                <p>Fetching 7-day forecast data...</p>
-              </div>
+              <TabLoadingFallback />
             ) : forecastData.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {forecastData.map((day, idx) => (
