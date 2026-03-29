@@ -41,11 +41,59 @@ import {
   ComposedChart,
   Bar
 } from 'recharts';
-import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type, type GroundingChunkMaps } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 
 type TabId = 'telemetry' | 'risk' | 'map' | 'forecast' | 'locker';
 interface GeoLocation { lat: number; lng: number; }
+
+interface TelemetryPoint {
+  time: string;
+  rawDate: Date;
+  temp: number;
+  humidity: number;
+  pressure: number;
+  precipitation: number;
+}
+
+interface ForecastDay {
+  date: string;
+  tempMax: number;
+  tempMin: number;
+  precip: number;
+  wind: number;
+  uv: number;
+}
+
+interface DirectiveShard { id: string; hash: string; content: string; }
+
+interface LockerEntry {
+  id: string;
+  timestamp: number;
+  shards: DirectiveShard[];
+  report: string;
+  riskLevel: 'Green' | 'Amber' | 'Red' | 'Black' | null;
+}
+
+type MapLink = GroundingChunkMaps;
+
+interface MetricCardProps {
+  title: string;
+  value: string | number;
+  unit: string;
+  icon: React.ElementType;
+  type: string;
+}
+
+interface Telemetry {
+  temp: number;
+  humidity: number;
+  pressure: number;
+  precipitation: number;
+  tide: number;
+  uvIndex: number;
+  aqi: number;
+}
 
 const mockWeatherData = Array.from({ length: 24 }, (_, i) => ({
   time: `${i}:00`,
@@ -126,7 +174,7 @@ const getMetricStatus = (type: string, value: number) => {
   }
 };
 
-const MetricCard = ({ title, value, unit, icon: Icon, type }: any) => {
+const MetricCard = ({ title, value, unit, icon: Icon, type }: MetricCardProps) => {
   const statusInfo = getMetricStatus(type, typeof value === 'string' ? parseFloat(value.replace(/,/g, '')) : Number(value));
   return (
     <div className={`bg-[#111] border ${statusInfo.border} rounded-xl p-5 flex flex-col relative overflow-hidden transition-all duration-300 hover:bg-[#161616] shadow-sm`}>
@@ -190,25 +238,25 @@ export default function App() {
   const [piLocation, setPiLocation] = useState<GeoLocation>(DEFAULT_LOCATION);
 
   // Locker State
-  const [lockerEntries, setLockerEntries] = useState<any[]>([]);
+  const [lockerEntries, setLockerEntries] = useState<LockerEntry[]>([]);
   const [lockerSearch, setLockerSearch] = useState('');
   const [lockerFilter, setLockerFilter] = useState('All');
   const [expandedLockerId, setExpandedLockerId] = useState<string | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
   // Forecast State
-  const [forecastData, setForecastData] = useState<any[]>([]);
+  const [forecastData, setForecastData] = useState<ForecastDay[]>([]);
   const [isFetchingForecast, setIsFetchingForecast] = useState(false);
 
   // Load Locker on Mount
   useEffect(() => {
     const saved = localStorage.getItem('zedd_sharding_locker');
     if (saved) {
-      try { setLockerEntries(JSON.parse(saved)); } catch (e) {}
+      try { setLockerEntries(JSON.parse(saved)); } catch (e) { console.error('Failed to load locker from localStorage', e); }
     }
   }, []);
 
-  const saveToLocker = (shards: any[], report: string, level: string | null) => {
+  const saveToLocker = (shards: DirectiveShard[], report: string, level: 'Green' | 'Amber' | 'Red' | 'Black' | null) => {
     const newEntry = {
       id: 'LKR-' + Date.now(),
       timestamp: Date.now(),
@@ -387,7 +435,7 @@ export default function App() {
   };
 
   // Automated AI Risk Analysis based purely on telemetry
-  const autoAnalyzeRisk = async (telemetry: any) => {
+  const autoAnalyzeRisk = async (telemetry: Telemetry) => {
     setIsAnalyzing(true);
     setDirectiveShards([]);
     try {
@@ -446,8 +494,8 @@ export default function App() {
   // Fetch telemetry on mount and set interval
   useEffect(() => {
     let isMounted = true;
-    let interval: any;
-    let simInterval: any;
+    let interval: ReturnType<typeof setInterval> | undefined;
+    let simInterval: ReturnType<typeof setInterval> | undefined;
     
     const init = async () => {
       let location = DEFAULT_LOCATION;
@@ -500,7 +548,7 @@ export default function App() {
   // Map State
   const [isFetchingMap, setIsFetchingMap] = useState(false);
   const [mapReport, setMapReport] = useState<string | null>(null);
-  const [mapLinks, setMapLinks] = useState<any[]>([]);
+  const [mapLinks, setMapLinks] = useState<MapLink[]>([]);
   const [isLocating, setIsLocating] = useState(false);
 
   // Initial Geolocation
@@ -543,7 +591,7 @@ export default function App() {
 
   // Historical Data State
   const [historicalRange, setHistoricalRange] = useState<'7d' | '14d' | '30d'>('7d');
-  const [historicalData, setHistoricalData] = useState<any[]>([]);
+  const [historicalData, setHistoricalData] = useState<TelemetryPoint[]>([]);
   const [isFetchingHistory, setIsFetchingHistory] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportMetrics, setExportMetrics] = useState({
@@ -565,7 +613,7 @@ export default function App() {
     
     // Create CSV rows
     const rows = historicalData.map(data => {
-      const row = [data.time];
+      const row: (string | number)[] = [data.time];
       if (exportMetrics.temp) row.push(data.temp);
       if (exportMetrics.humidity) row.push(data.humidity);
       if (exportMetrics.pressure) row.push(data.pressure);
@@ -611,7 +659,7 @@ export default function App() {
           
           // Filter to show roughly 1 point per day for longer ranges to avoid chart clutter, or every 6 hours for 7 days
           const step = days === 7 ? 6 : (days === 14 ? 12 : 24);
-          const sampledData = formattedData.filter((_: any, i: number) => i % step === 0);
+          const sampledData = formattedData.filter((_: TelemetryPoint, i: number) => i % step === 0);
           
           setHistoricalData(sampledData);
         }
@@ -868,7 +916,8 @@ export default function App() {
       
       const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
       if (chunks) {
-        const links = chunks.map((chunk: any) => chunk.maps).filter(Boolean);
+        // Filter out chunks that don't have a maps field; non-null maps entries are guaranteed to be MapLink objects
+        const links: MapLink[] = chunks.map(chunk => chunk.maps).filter((m): m is MapLink => m != null);
         // Remove duplicates based on URI
         const uniqueLinks = Array.from(new Map(links.map(item => [item.uri, item])).values());
         setMapLinks(uniqueLinks);
@@ -1453,7 +1502,7 @@ export default function App() {
                         </a>
                         {mapData.placeAnswerSources?.reviewSnippets && mapData.placeAnswerSources.reviewSnippets.length > 0 && (
                           <div className="mt-2 space-y-2 border-t border-slate-800 pt-2">
-                            {mapData.placeAnswerSources.reviewSnippets.map((snippet: any, sIdx: number) => (
+                            {(mapData.placeAnswerSources.reviewSnippets as { text: string; authorName?: string }[]).map((snippet, sIdx: number) => (
                               <div key={sIdx} className="text-xs text-slate-400 italic bg-slate-800/50 p-2 rounded">
                                 "{snippet.text}"
                                 {snippet.authorName && <span className="block mt-1 text-slate-500">- {snippet.authorName}</span>}
@@ -1627,7 +1676,7 @@ export default function App() {
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {entry.shards.slice(0, expandedLockerId === entry.id ? undefined : 2).map((shard: any) => (
+                        {entry.shards.slice(0, expandedLockerId === entry.id ? undefined : 2).map((shard: DirectiveShard) => (
                           <div key={shard.id} className="p-2 bg-slate-900 border border-slate-800 rounded flex items-center justify-between">
                             <span className="text-[10px] font-mono text-slate-400">{shard.id}</span>
                             <span className="text-[10px] font-mono text-emerald-500/70 truncate ml-2">{shard.hash}</span>
