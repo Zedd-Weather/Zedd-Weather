@@ -25,6 +25,10 @@ import {
   Upload,
   Search,
   Filter,
+  Volume2,
+  VolumeX,
+  Bell,
+  BellOff,
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
@@ -41,59 +45,12 @@ import {
   ComposedChart,
   Bar
 } from 'recharts';
-import { GoogleGenAI, ThinkingLevel, Type, type GroundingChunkMaps } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
+import { Toaster, toast } from 'sonner';
 
 type TabId = 'telemetry' | 'risk' | 'map' | 'forecast' | 'locker';
 interface GeoLocation { lat: number; lng: number; }
-
-interface TelemetryPoint {
-  time: string;
-  rawDate: Date;
-  temp: number;
-  humidity: number;
-  pressure: number;
-  precipitation: number;
-}
-
-interface ForecastDay {
-  date: string;
-  tempMax: number;
-  tempMin: number;
-  precip: number;
-  wind: number;
-  uv: number;
-}
-
-interface DirectiveShard { id: string; hash: string; content: string; }
-
-interface LockerEntry {
-  id: string;
-  timestamp: number;
-  shards: DirectiveShard[];
-  report: string;
-  riskLevel: 'Green' | 'Amber' | 'Red' | 'Black' | null;
-}
-
-type MapLink = GroundingChunkMaps;
-
-interface MetricCardProps {
-  title: string;
-  value: string | number;
-  unit: string;
-  icon: React.ElementType;
-  type: string;
-}
-
-interface Telemetry {
-  temp: number;
-  humidity: number;
-  pressure: number;
-  precipitation: number;
-  tide: number;
-  uvIndex: number;
-  aqi: number;
-}
 
 const mockWeatherData = Array.from({ length: 24 }, (_, i) => ({
   time: `${i}:00`,
@@ -174,10 +131,15 @@ const getMetricStatus = (type: string, value: number) => {
   }
 };
 
-const MetricCard = ({ title, value, unit, icon: Icon, type }: MetricCardProps) => {
+const MetricCard = ({ title, value, unit, icon: Icon, type }: any) => {
   const statusInfo = getMetricStatus(type, typeof value === 'string' ? parseFloat(value.replace(/,/g, '')) : Number(value));
+  const isCritical = statusInfo.label === 'Critical' || statusInfo.label === 'Hazardous' || statusInfo.label === 'Extreme';
+  
   return (
-    <div className={`bg-[#111] border ${statusInfo.border} rounded-xl p-5 flex flex-col relative overflow-hidden transition-all duration-300 hover:bg-[#161616] shadow-sm`}>
+    <div className={`bg-[#111] border ${statusInfo.border} rounded-xl p-5 flex flex-col relative overflow-hidden transition-all duration-300 hover:bg-[#161616] shadow-sm ${isCritical ? 'ring-1 ring-rose-500/50 animate-pulse' : ''}`}>
+      {isCritical && (
+        <div className="absolute top-0 right-0 w-12 h-12 -mr-6 -mt-6 bg-rose-500/20 blur-xl rounded-full"></div>
+      )}
       <div className="flex justify-between items-start mb-4">
         <div className={`p-2.5 rounded-lg ${statusInfo.bg} ${statusInfo.color}`}>
           <Icon className="w-5 h-5" />
@@ -237,26 +199,110 @@ export default function App() {
   // Pi Location State
   const [piLocation, setPiLocation] = useState<GeoLocation>(DEFAULT_LOCATION);
 
+  // Alert System State
+  const [activeAlerts, setActiveAlerts] = useState<{id: string, type: string, message: string, severity: 'critical' | 'warning', timestamp: number}[]>([]);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showAlerts, setShowAlerts] = useState(false);
+  const alertedIdsRef = useRef<Set<string>>(new Set());
+
+  const playAlertSound = (severity: 'critical' | 'warning') => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      oscillator.type = severity === 'critical' ? 'sawtooth' : 'sine';
+      oscillator.frequency.setValueAtTime(severity === 'critical' ? 440 : 880, audioCtx.currentTime);
+      
+      gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.5);
+    } catch (e) {
+      console.warn("Audio alert failed", e);
+    }
+  };
+
+  useEffect(() => {
+    const newAlerts: typeof activeAlerts = [];
+    
+    // Temperature Thresholds
+    if (currentTelemetry.temp > 35 || currentTelemetry.temp < 0) {
+      newAlerts.push({ id: 'temp-crit', type: 'Temperature', message: `Critical Temperature: ${currentTelemetry.temp.toFixed(1)}°C`, severity: 'critical', timestamp: Date.now() });
+    } else if (currentTelemetry.temp > 30 || currentTelemetry.temp < 5) {
+      newAlerts.push({ id: 'temp-warn', type: 'Temperature', message: `High Temperature: ${currentTelemetry.temp.toFixed(1)}°C`, severity: 'warning', timestamp: Date.now() });
+    }
+
+    // AQI Thresholds
+    if (currentTelemetry.aqi > 150) {
+      newAlerts.push({ id: 'aqi-crit', type: 'AQI', message: `Hazardous Air Quality: ${Math.round(currentTelemetry.aqi)}`, severity: 'critical', timestamp: Date.now() });
+    } else if (currentTelemetry.aqi > 100) {
+      newAlerts.push({ id: 'aqi-warn', type: 'AQI', message: `Unhealthy Air Quality: ${Math.round(currentTelemetry.aqi)}`, severity: 'warning', timestamp: Date.now() });
+    }
+
+    // Precipitation Thresholds
+    if (currentTelemetry.precipitation > 80) {
+      newAlerts.push({ id: 'precip-crit', type: 'Precipitation', message: `Critical Precipitation Risk: ${currentTelemetry.precipitation}%`, severity: 'critical', timestamp: Date.now() });
+    } else if (currentTelemetry.precipitation > 50) {
+      newAlerts.push({ id: 'precip-warn', type: 'Precipitation', message: `High Precipitation Risk: ${currentTelemetry.precipitation}%`, severity: 'warning', timestamp: Date.now() });
+    }
+
+    // Check for new alerts to play sound and show toast
+    const currentIds = new Set(newAlerts.map(a => a.id));
+    
+    newAlerts.forEach(alert => {
+      if (!alertedIdsRef.current.has(alert.id)) {
+        // New alert triggered
+        if (alert.severity === 'critical') {
+          toast.error(alert.message, {
+            description: `Severity: ${alert.type} Critical`,
+            duration: 10000,
+          });
+        } else {
+          toast.warning(alert.message, {
+            description: `Severity: ${alert.type} Warning`,
+            duration: 5000,
+          });
+        }
+      }
+    });
+
+    const hasNewCritical = newAlerts.some(a => a.severity === 'critical' && !alertedIdsRef.current.has(a.id));
+    const hasNewWarning = newAlerts.some(a => a.severity === 'warning' && !alertedIdsRef.current.has(a.id));
+
+    if (!isMuted && (hasNewCritical || hasNewWarning)) {
+      playAlertSound(hasNewCritical ? 'critical' : 'warning');
+    }
+
+    // Update the ref
+    alertedIdsRef.current = currentIds;
+    setActiveAlerts(newAlerts);
+  }, [currentTelemetry, isMuted]);
+
   // Locker State
-  const [lockerEntries, setLockerEntries] = useState<LockerEntry[]>([]);
+  const [lockerEntries, setLockerEntries] = useState<any[]>([]);
   const [lockerSearch, setLockerSearch] = useState('');
   const [lockerFilter, setLockerFilter] = useState('All');
   const [expandedLockerId, setExpandedLockerId] = useState<string | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
   // Forecast State
-  const [forecastData, setForecastData] = useState<ForecastDay[]>([]);
+  const [forecastData, setForecastData] = useState<any[]>([]);
   const [isFetchingForecast, setIsFetchingForecast] = useState(false);
 
   // Load Locker on Mount
   useEffect(() => {
     const saved = localStorage.getItem('zedd_sharding_locker');
     if (saved) {
-      try { setLockerEntries(JSON.parse(saved)); } catch (e) { console.error('Failed to load locker from localStorage', e); }
+      try { setLockerEntries(JSON.parse(saved)); } catch (e) {}
     }
   }, []);
 
-  const saveToLocker = (shards: DirectiveShard[], report: string, level: 'Green' | 'Amber' | 'Red' | 'Black' | null) => {
+  const saveToLocker = (shards: any[], report: string, level: string | null) => {
     const newEntry = {
       id: 'LKR-' + Date.now(),
       timestamp: Date.now(),
@@ -435,7 +481,7 @@ export default function App() {
   };
 
   // Automated AI Risk Analysis based purely on telemetry
-  const autoAnalyzeRisk = async (telemetry: Telemetry) => {
+  const autoAnalyzeRisk = async (telemetry: any) => {
     setIsAnalyzing(true);
     setDirectiveShards([]);
     try {
@@ -494,8 +540,8 @@ export default function App() {
   // Fetch telemetry on mount and set interval
   useEffect(() => {
     let isMounted = true;
-    let interval: ReturnType<typeof setInterval> | undefined;
-    let simInterval: ReturnType<typeof setInterval> | undefined;
+    let interval: any;
+    let simInterval: any;
     
     const init = async () => {
       let location = DEFAULT_LOCATION;
@@ -548,7 +594,7 @@ export default function App() {
   // Map State
   const [isFetchingMap, setIsFetchingMap] = useState(false);
   const [mapReport, setMapReport] = useState<string | null>(null);
-  const [mapLinks, setMapLinks] = useState<MapLink[]>([]);
+  const [mapLinks, setMapLinks] = useState<any[]>([]);
   const [isLocating, setIsLocating] = useState(false);
 
   // Initial Geolocation
@@ -591,7 +637,7 @@ export default function App() {
 
   // Historical Data State
   const [historicalRange, setHistoricalRange] = useState<'7d' | '14d' | '30d'>('7d');
-  const [historicalData, setHistoricalData] = useState<TelemetryPoint[]>([]);
+  const [historicalData, setHistoricalData] = useState<any[]>([]);
   const [isFetchingHistory, setIsFetchingHistory] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportMetrics, setExportMetrics] = useState({
@@ -613,7 +659,7 @@ export default function App() {
     
     // Create CSV rows
     const rows = historicalData.map(data => {
-      const row: (string | number)[] = [data.time];
+      const row = [data.time];
       if (exportMetrics.temp) row.push(data.temp);
       if (exportMetrics.humidity) row.push(data.humidity);
       if (exportMetrics.pressure) row.push(data.pressure);
@@ -659,7 +705,7 @@ export default function App() {
           
           // Filter to show roughly 1 point per day for longer ranges to avoid chart clutter, or every 6 hours for 7 days
           const step = days === 7 ? 6 : (days === 14 ? 12 : 24);
-          const sampledData = formattedData.filter((_: TelemetryPoint, i: number) => i % step === 0);
+          const sampledData = formattedData.filter((_: any, i: number) => i % step === 0);
           
           setHistoricalData(sampledData);
         }
@@ -916,8 +962,7 @@ export default function App() {
       
       const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
       if (chunks) {
-        // Filter out chunks that don't have a maps field; non-null maps entries are guaranteed to be MapLink objects
-        const links: MapLink[] = chunks.map(chunk => chunk.maps).filter((m): m is MapLink => m != null);
+        const links = chunks.map((chunk: any) => chunk.maps).filter(Boolean);
         // Remove duplicates based on URI
         const uniqueLinks = Array.from(new Map(links.map(item => [item.uri, item])).values());
         setMapLinks(uniqueLinks);
@@ -939,6 +984,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-slate-200 font-sans selection:bg-emerald-500/30">
+      <Toaster position="top-right" theme="dark" richColors closeButton />
       {/* Top Navigation */}
       <header className="border-b border-slate-800 bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -954,6 +1000,62 @@ export default function App() {
             </span>
           </div>
           <div className="flex items-center space-x-4">
+            {/* Alert System Controls */}
+            <div className="flex items-center space-x-2 mr-2">
+              <button 
+                onClick={() => setIsMuted(!isMuted)}
+                className={`p-2 rounded-lg border transition-colors ${isMuted ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                title={isMuted ? "Unmute Alerts" : "Mute Alerts"}
+              >
+                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+              
+              <div className="relative">
+                <button 
+                  onClick={() => setShowAlerts(!showAlerts)}
+                  className={`p-2 rounded-lg border transition-colors relative ${activeAlerts.length > 0 ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                >
+                  {activeAlerts.length > 0 ? <Bell className="w-4 h-4 animate-pulse" /> : <BellOff className="w-4 h-4" />}
+                  {activeAlerts.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[#0a0a0a]">
+                      {activeAlerts.length}
+                    </span>
+                  )}
+                </button>
+                
+                {/* Alerts Dropdown */}
+                {showAlerts && (
+                  <div className="absolute right-0 mt-2 w-80 bg-[#111] border border-slate-800 rounded-xl shadow-2xl z-[60] overflow-hidden">
+                    <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                      <h3 className="text-sm font-bold text-slate-200">Active Alerts</h3>
+                      <button onClick={() => setShowAlerts(false)} className="text-slate-500 hover:text-slate-300">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto p-2 space-y-2">
+                      {activeAlerts.length === 0 ? (
+                        <div className="py-8 text-center">
+                          <ShieldCheck className="w-8 h-8 text-emerald-500/30 mx-auto mb-2" />
+                          <p className="text-xs text-slate-500">No active alerts. System secure.</p>
+                        </div>
+                      ) : (
+                        activeAlerts.map(alert => (
+                          <div key={alert.id} className={`p-3 rounded-lg border flex items-start space-x-3 ${alert.severity === 'critical' ? 'bg-rose-500/10 border-rose-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
+                            <AlertTriangle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${alert.severity === 'critical' ? 'text-rose-400' : 'text-amber-400'}`} />
+                            <div>
+                              <p className={`text-xs font-bold uppercase tracking-wider ${alert.severity === 'critical' ? 'text-rose-400' : 'text-amber-400'}`}>{alert.type}</p>
+                              <p className="text-sm text-slate-200 mt-0.5">{alert.message}</p>
+                              <p className="text-[10px] text-slate-500 mt-1">{new Date(alert.timestamp).toLocaleTimeString()}</p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
             <div className="flex items-center space-x-2 text-sm text-slate-400 bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
               <span>Minima Network Sync: OK</span>
@@ -1502,7 +1604,7 @@ export default function App() {
                         </a>
                         {mapData.placeAnswerSources?.reviewSnippets && mapData.placeAnswerSources.reviewSnippets.length > 0 && (
                           <div className="mt-2 space-y-2 border-t border-slate-800 pt-2">
-                            {(mapData.placeAnswerSources.reviewSnippets as { text: string; authorName?: string }[]).map((snippet, sIdx: number) => (
+                            {mapData.placeAnswerSources.reviewSnippets.map((snippet: any, sIdx: number) => (
                               <div key={sIdx} className="text-xs text-slate-400 italic bg-slate-800/50 p-2 rounded">
                                 "{snippet.text}"
                                 {snippet.authorName && <span className="block mt-1 text-slate-500">- {snippet.authorName}</span>}
@@ -1676,7 +1778,7 @@ export default function App() {
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {entry.shards.slice(0, expandedLockerId === entry.id ? undefined : 2).map((shard: DirectiveShard) => (
+                        {entry.shards.slice(0, expandedLockerId === entry.id ? undefined : 2).map((shard: any) => (
                           <div key={shard.id} className="p-2 bg-slate-900 border border-slate-800 rounded flex items-center justify-between">
                             <span className="text-[10px] font-mono text-slate-400">{shard.id}</span>
                             <span className="text-[10px] font-mono text-emerald-500/70 truncate ml-2">{shard.hash}</span>

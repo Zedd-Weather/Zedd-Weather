@@ -1,4 +1,4 @@
-# Zedd Weather Dashboard - PiNetOS v2
+# Zedd Weather Dashboard
 
 Zedd Weather is a decentralized edge cloud operating system and telemetry dashboard designed for industrial construction sites. It leverages real-time micro-climate data, Gemini 3.1 Pro AI for automated risk analysis, and the Minima network for cryptographic attestation of environmental conditions.
 
