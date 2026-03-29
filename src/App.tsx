@@ -136,23 +136,23 @@ const MetricCard = ({ title, value, unit, icon: Icon, type }: any) => {
   const isCritical = statusInfo.label === 'Critical' || statusInfo.label === 'Hazardous' || statusInfo.label === 'Extreme';
   
   return (
-    <div className={`bg-[#111] border ${statusInfo.border} rounded-xl p-5 flex flex-col relative overflow-hidden transition-all duration-300 hover:bg-[#161616] shadow-sm ${isCritical ? 'ring-1 ring-rose-500/50 animate-pulse' : ''}`}>
+    <div className={`bg-[#111] border ${statusInfo.border} rounded-xl p-3 sm:p-5 flex flex-col relative overflow-hidden transition-all duration-300 hover:bg-[#161616] shadow-sm ${isCritical ? 'ring-1 ring-rose-500/50 animate-pulse' : ''}`}>
       {isCritical && (
-        <div className="absolute top-0 right-0 w-12 h-12 -mr-6 -mt-6 bg-rose-500/20 blur-xl rounded-full"></div>
+        <div className="absolute top-0 right-0 w-10 h-10 sm:w-12 sm:h-12 -mr-5 -mt-5 sm:-mr-6 sm:-mt-6 bg-rose-500/20 blur-xl rounded-full"></div>
       )}
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-2.5 rounded-lg ${statusInfo.bg} ${statusInfo.color}`}>
-          <Icon className="w-5 h-5" />
+      <div className="flex justify-between items-start mb-2 sm:mb-4">
+        <div className={`p-1.5 sm:p-2.5 rounded-lg ${statusInfo.bg} ${statusInfo.color}`}>
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
         </div>
-        <span className={`text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full ${statusInfo.bg} ${statusInfo.color}`}>
+        <span className={`text-[8px] sm:text-[10px] uppercase tracking-wider font-bold px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full ${statusInfo.bg} ${statusInfo.color}`}>
           {statusInfo.label}
         </span>
       </div>
       <div>
-        <p className="text-sm text-slate-400 font-medium mb-1">{title}</p>
+        <p className="text-[10px] sm:text-sm text-slate-400 font-medium mb-0.5 sm:mb-1">{title}</p>
         <div className="flex items-baseline space-x-1">
-          <p className="text-3xl font-bold text-slate-100 tracking-tight">{value}</p>
-          <span className="text-sm text-slate-500 font-medium">{unit}</span>
+          <p className="text-xl sm:text-3xl font-bold text-slate-100 tracking-tight">{value}</p>
+          <span className="text-[10px] sm:text-sm text-slate-500 font-medium">{unit}</span>
         </div>
       </div>
     </div>
@@ -988,36 +988,36 @@ export default function App() {
       {/* Top Navigation */}
       <header className="border-b border-slate-800 bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center">
-              <Cloud className="w-5 h-5 text-emerald-400" />
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center flex-shrink-0">
+              <Cloud className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-slate-100">
+            <span className="text-lg sm:text-xl font-bold tracking-tight text-slate-100 truncate">
               Zedd Weather
             </span>
-            <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold bg-slate-800 text-slate-400 ml-2">
+            <span className="hidden xs:inline-block px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold bg-slate-800 text-slate-400 ml-1 sm:ml-2">
               Enterprise
             </span>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             {/* Alert System Controls */}
-            <div className="flex items-center space-x-2 mr-2">
+            <div className="flex items-center space-x-1 sm:space-x-2">
               <button 
                 onClick={() => setIsMuted(!isMuted)}
-                className={`p-2 rounded-lg border transition-colors ${isMuted ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                className={`p-1.5 sm:p-2 rounded-lg border transition-colors ${isMuted ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'}`}
                 title={isMuted ? "Unmute Alerts" : "Mute Alerts"}
               >
-                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                {isMuted ? <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
               </button>
               
               <div className="relative">
                 <button 
                   onClick={() => setShowAlerts(!showAlerts)}
-                  className={`p-2 rounded-lg border transition-colors relative ${activeAlerts.length > 0 ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                  className={`p-1.5 sm:p-2 rounded-lg border transition-colors relative ${activeAlerts.length > 0 ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'}`}
                 >
-                  {activeAlerts.length > 0 ? <Bell className="w-4 h-4 animate-pulse" /> : <BellOff className="w-4 h-4" />}
+                  {activeAlerts.length > 0 ? <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-pulse" /> : <BellOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                   {activeAlerts.length > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[#0a0a0a]">
+                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-rose-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[#0a0a0a]">
                       {activeAlerts.length}
                     </span>
                   )}
@@ -1025,27 +1025,27 @@ export default function App() {
                 
                 {/* Alerts Dropdown */}
                 {showAlerts && (
-                  <div className="absolute right-0 mt-2 w-80 bg-[#111] border border-slate-800 rounded-xl shadow-2xl z-[60] overflow-hidden">
-                    <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-                      <h3 className="text-sm font-bold text-slate-200">Active Alerts</h3>
+                  <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-[#111] border border-slate-800 rounded-xl shadow-2xl z-[60] overflow-hidden">
+                    <div className="p-3 sm:p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                      <h3 className="text-xs sm:text-sm font-bold text-slate-200">Active Alerts</h3>
                       <button onClick={() => setShowAlerts(false)} className="text-slate-500 hover:text-slate-300">
-                        <X className="w-4 h-4" />
+                        <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                     </div>
-                    <div className="max-h-96 overflow-y-auto p-2 space-y-2">
+                    <div className="max-h-80 sm:max-h-96 overflow-y-auto p-2 space-y-2">
                       {activeAlerts.length === 0 ? (
-                        <div className="py-8 text-center">
-                          <ShieldCheck className="w-8 h-8 text-emerald-500/30 mx-auto mb-2" />
-                          <p className="text-xs text-slate-500">No active alerts. System secure.</p>
+                        <div className="py-6 sm:py-8 text-center">
+                          <ShieldCheck className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-500/30 mx-auto mb-2" />
+                          <p className="text-[10px] sm:text-xs text-slate-500">No active alerts. System secure.</p>
                         </div>
                       ) : (
                         activeAlerts.map(alert => (
-                          <div key={alert.id} className={`p-3 rounded-lg border flex items-start space-x-3 ${alert.severity === 'critical' ? 'bg-rose-500/10 border-rose-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
-                            <AlertTriangle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${alert.severity === 'critical' ? 'text-rose-400' : 'text-amber-400'}`} />
+                          <div key={alert.id} className={`p-2 sm:p-3 rounded-lg border flex items-start space-x-2 sm:space-x-3 ${alert.severity === 'critical' ? 'bg-rose-500/10 border-rose-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
+                            <AlertTriangle className={`w-3.5 h-3.5 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0 ${alert.severity === 'critical' ? 'text-rose-400' : 'text-amber-400'}`} />
                             <div>
-                              <p className={`text-xs font-bold uppercase tracking-wider ${alert.severity === 'critical' ? 'text-rose-400' : 'text-amber-400'}`}>{alert.type}</p>
-                              <p className="text-sm text-slate-200 mt-0.5">{alert.message}</p>
-                              <p className="text-[10px] text-slate-500 mt-1">{new Date(alert.timestamp).toLocaleTimeString()}</p>
+                              <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${alert.severity === 'critical' ? 'text-rose-400' : 'text-amber-400'}`}>{alert.type}</p>
+                              <p className="text-xs sm:text-sm text-slate-200 mt-0.5">{alert.message}</p>
+                              <p className="text-[9px] sm:text-[10px] text-slate-500 mt-1">{new Date(alert.timestamp).toLocaleTimeString()}</p>
                             </div>
                           </div>
                         ))
@@ -1056,10 +1056,11 @@ export default function App() {
               </div>
             </div>
             
-            <div className="flex items-center space-x-2 text-sm text-slate-400 bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800">
+            <div className="hidden md:flex items-center space-x-2 text-sm text-slate-400 bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
               <span>Minima Network Sync: OK</span>
             </div>
+            <div className="md:hidden w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Minima Sync OK"></div>
           </div>
         </div>
       </header>
@@ -1087,28 +1088,28 @@ export default function App() {
 
         {activeTab === 'telemetry' && (
           <>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-slate-200">Current Readings</h2>
-              <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
+              <h2 className="text-lg sm:text-xl font-semibold text-slate-200">Current Readings</h2>
+              <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800 self-start sm:self-auto">
                 <button
                   onClick={() => setTelemetrySource('onboard')}
-                  className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  className={`px-3 sm:px-4 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
                     telemetrySource === 'onboard' 
                       ? 'bg-emerald-600 text-white shadow-sm' 
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  On Board Telemetry
+                  On Board
                 </button>
                 <button
                   onClick={() => setTelemetrySource('external')}
-                  className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  className={`px-3 sm:px-4 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium rounded-md transition-all ${
                     telemetrySource === 'external' 
                       ? 'bg-blue-600 text-white shadow-sm' 
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  AccuWeather API
+                  AccuWeather
                 </button>
               </div>
             </div>
@@ -1129,26 +1130,26 @@ export default function App() {
               {/* Left Column - Charts */}
               <div className="lg:col-span-2 space-y-8">
                 <div className="bg-[#111] border border-slate-800 rounded-xl p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-medium flex items-center text-slate-200">
-                      <Activity className="w-5 h-5 mr-2 text-rose-400" />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
+                    <h2 className="text-base sm:text-lg font-medium flex items-center text-slate-200">
+                      <Activity className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-rose-400" />
                       Historical Telemetry Trends
                     </h2>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2 sm:space-x-4">
                       <button
                         onClick={() => setIsExportModalOpen(true)}
                         disabled={isFetchingHistory || historicalData.length === 0}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors flex items-center"
+                        className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-[10px] sm:text-xs font-medium rounded-lg transition-colors flex items-center"
                         title="Export CSV"
                       >
-                        <Download className="w-3.5 h-3.5 mr-1.5" /> Export CSV
+                        <Download className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1 sm:mr-1.5" /> <span className="hidden xs:inline">Export CSV</span>
                       </button>
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-1 sm:space-x-2">
                         {(['7d', '14d', '30d'] as const).map((range) => (
                           <button
                             key={range}
                             onClick={() => setHistoricalRange(range)}
-                            className={`px-3 py-1 text-xs font-medium rounded-lg border transition-colors ${
+                            className={`px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium rounded-lg border transition-colors ${
                               historicalRange === range 
                                 ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' 
                                 : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
@@ -1350,34 +1351,34 @@ export default function App() {
                   The system continuously monitors live telemetry and uses Gemini 3.1 Pro (High Thinking) 
                   to generate mitigation directives without human interaction.
                 </p>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
-                  <div className="bg-[#1a1a1a] p-3 rounded-lg border border-slate-800">
-                    <p className="text-xs text-slate-500">Live Temp</p>
-                    <p className="text-lg font-semibold text-slate-200">{currentTelemetry.temp.toFixed(1)}°C</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
+                  <div className="bg-[#1a1a1a] p-2 sm:p-3 rounded-lg border border-slate-800">
+                    <p className="text-[10px] sm:text-xs text-slate-500">Live Temp</p>
+                    <p className="text-base sm:text-lg font-semibold text-slate-200">{currentTelemetry.temp.toFixed(1)}°C</p>
                   </div>
-                  <div className="bg-[#1a1a1a] p-3 rounded-lg border border-slate-800">
-                    <p className="text-xs text-slate-500">Humidity</p>
-                    <p className="text-lg font-semibold text-slate-200">{currentTelemetry.humidity.toFixed(1)}%</p>
+                  <div className="bg-[#1a1a1a] p-2 sm:p-3 rounded-lg border border-slate-800">
+                    <p className="text-[10px] sm:text-xs text-slate-500">Humidity</p>
+                    <p className="text-base sm:text-lg font-semibold text-slate-200">{currentTelemetry.humidity.toFixed(1)}%</p>
                   </div>
-                  <div className="bg-[#1a1a1a] p-3 rounded-lg border border-slate-800">
-                    <p className="text-xs text-slate-500">Pressure</p>
-                    <p className="text-lg font-semibold text-slate-200">{currentTelemetry.pressure.toFixed(1)} hPa</p>
+                  <div className="bg-[#1a1a1a] p-2 sm:p-3 rounded-lg border border-slate-800">
+                    <p className="text-[10px] sm:text-xs text-slate-500">Pressure</p>
+                    <p className="text-base sm:text-lg font-semibold text-slate-200">{currentTelemetry.pressure.toFixed(1)} hPa</p>
                   </div>
-                  <div className="bg-[#1a1a1a] p-3 rounded-lg border border-slate-800">
-                    <p className="text-xs text-slate-500">Precipitation</p>
-                    <p className="text-lg font-semibold text-slate-200">{currentTelemetry.precipitation.toFixed(0)} %</p>
+                  <div className="bg-[#1a1a1a] p-2 sm:p-3 rounded-lg border border-slate-800">
+                    <p className="text-[10px] sm:text-xs text-slate-500">Precipitation</p>
+                    <p className="text-base sm:text-lg font-semibold text-slate-200">{currentTelemetry.precipitation.toFixed(0)} %</p>
                   </div>
-                  <div className="bg-[#1a1a1a] p-3 rounded-lg border border-slate-800">
-                    <p className="text-xs text-slate-500">Tide Level</p>
-                    <p className="text-lg font-semibold text-slate-200">{currentTelemetry.tide.toFixed(2)} m</p>
+                  <div className="bg-[#1a1a1a] p-2 sm:p-3 rounded-lg border border-slate-800">
+                    <p className="text-[10px] sm:text-xs text-slate-500">Tide Level</p>
+                    <p className="text-base sm:text-lg font-semibold text-slate-200">{currentTelemetry.tide.toFixed(2)} m</p>
                   </div>
-                  <div className="bg-[#1a1a1a] p-3 rounded-lg border border-slate-800">
-                    <p className="text-xs text-slate-500">UV Index</p>
-                    <p className="text-lg font-semibold text-slate-200">{currentTelemetry.uvIndex.toFixed(1)}</p>
+                  <div className="bg-[#1a1a1a] p-2 sm:p-3 rounded-lg border border-slate-800">
+                    <p className="text-[10px] sm:text-xs text-slate-500">UV Index</p>
+                    <p className="text-base sm:text-lg font-semibold text-slate-200">{currentTelemetry.uvIndex.toFixed(1)}</p>
                   </div>
-                  <div className="bg-[#1a1a1a] p-3 rounded-lg border border-slate-800">
-                    <p className="text-xs text-slate-500">Live AQI</p>
-                    <p className="text-lg font-semibold text-slate-200">{Math.round(currentTelemetry.aqi)}</p>
+                  <div className="bg-[#1a1a1a] p-2 sm:p-3 rounded-lg border border-slate-800">
+                    <p className="text-[10px] sm:text-xs text-slate-500">Live AQI</p>
+                    <p className="text-base sm:text-lg font-semibold text-slate-200">{Math.round(currentTelemetry.aqi)}</p>
                   </div>
                 </div>
               </div>
@@ -1459,40 +1460,40 @@ export default function App() {
                     <div className="markdown-body text-sm text-slate-300">
                       <ReactMarkdown>{riskReport}</ReactMarkdown>
                     </div>
-                    <div className="mt-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-emerald-400 font-mono flex items-center">
-                          <Terminal className="w-3 h-3 mr-2" />
+                    <div className="mt-6 p-3 sm:p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <p className="text-[10px] sm:text-xs text-emerald-400 font-mono flex items-center">
+                          <Terminal className="w-3 h-3 mr-2 flex-shrink-0" />
                           Directive ready for Minima attestation (SHA-256)
                         </p>
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={exportShards}
                             disabled={directiveShards.length === 0}
-                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors flex items-center"
+                            className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-[10px] sm:text-xs font-medium rounded-lg transition-colors flex items-center"
                             title="Export Shards"
                           >
-                            <Download className="w-3.5 h-3.5 mr-1.5" /> Export
+                            <Download className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1 sm:mr-1.5" /> Export
                           </button>
                           <button
                             onClick={() => importFileRef.current?.click()}
-                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center"
+                            className="px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-[10px] sm:text-xs font-medium rounded-lg transition-colors flex items-center"
                             title="Import Shards"
                           >
-                            <Upload className="w-3.5 h-3.5 mr-1.5" /> Import
+                            <Upload className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1 sm:mr-1.5" /> Import
                           </button>
                           <input type="file" ref={importFileRef} onChange={importShards} accept=".json" className="hidden" />
                           <button
                             onClick={shardDirectives}
                             disabled={isSharding || directiveShards.length > 0}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-medium rounded-lg transition-colors flex items-center"
+                            className="px-2 sm:px-3 py-1 sm:py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-[10px] sm:text-xs font-medium rounded-lg transition-colors flex items-center"
                           >
                             {isSharding ? (
-                              <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Sharding...</>
+                              <><Loader2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1 sm:mr-1.5 animate-spin" /> Sharding...</>
                             ) : directiveShards.length > 0 ? (
-                              <><ShieldCheck className="w-3.5 h-3.5 mr-1.5" /> Sharded</>
+                              <><ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1 sm:mr-1.5" /> Sharded</>
                             ) : (
-                              <><Database className="w-3.5 h-3.5 mr-1.5" /> Shard Directives</>
+                              <><Database className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1 sm:mr-1.5" /> Shard</>
                             )}
                           </button>
                         </div>
@@ -1564,7 +1565,7 @@ export default function App() {
             ) : mapReport ? (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
-                  <div className="h-[400px] w-full bg-[#1a1a1a] rounded-xl border border-slate-800 overflow-hidden">
+                  <div className="h-[300px] sm:h-[400px] w-full bg-[#1a1a1a] rounded-xl border border-slate-800 overflow-hidden">
                     <iframe 
                       width="100%" 
                       height="100%" 
@@ -1658,7 +1659,7 @@ export default function App() {
             {isFetchingForecast ? (
               <TabLoadingFallback />
             ) : forecastData.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {forecastData.map((day, idx) => (
                   <div key={idx} className="bg-[#1a1a1a] p-4 rounded-xl border border-slate-800 flex flex-col">
                     <p className="text-sm font-semibold text-slate-300 mb-3">{day.date}</p>
@@ -1706,23 +1707,23 @@ export default function App() {
             </div>
 
             {/* Search and Filter Bar */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500" />
                 <input 
                   type="text" 
-                  placeholder="Search by ID or report content..." 
+                  placeholder="Search ID or content..." 
                   value={lockerSearch}
                   onChange={(e) => setLockerSearch(e.target.value)}
-                  className="w-full bg-[#1a1a1a] border border-slate-800 rounded-lg pl-10 pr-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                  className="w-full bg-[#1a1a1a] border border-slate-800 rounded-lg pl-9 sm:pl-10 pr-4 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50 transition-colors"
                 />
               </div>
               <div className="relative w-full sm:w-48">
-                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500" />
                 <select 
                   value={lockerFilter}
                   onChange={(e) => setLockerFilter(e.target.value)}
-                  className="w-full bg-[#1a1a1a] border border-slate-800 rounded-lg pl-10 pr-8 py-2 text-sm text-slate-200 appearance-none focus:outline-none focus:border-emerald-500/50 transition-colors cursor-pointer"
+                  className="w-full bg-[#1a1a1a] border border-slate-800 rounded-lg pl-9 sm:pl-10 pr-8 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-200 appearance-none focus:outline-none focus:border-emerald-500/50 transition-colors cursor-pointer"
                 >
                   <option value="All">All Risk Levels</option>
                   <option value="Green">Green (Low)</option>
@@ -1730,7 +1731,7 @@ export default function App() {
                   <option value="Red">Red (High)</option>
                   <option value="Black">Black (Shutdown)</option>
                 </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 pointer-events-none" />
               </div>
             </div>
             
@@ -1744,19 +1745,19 @@ export default function App() {
                     return matchesSearch && matchesFilter;
                   })
                   .map((entry) => (
-                  <div key={entry.id} className="bg-[#1a1a1a] p-5 rounded-xl border border-slate-800 transition-all">
-                    <div className="flex justify-between items-start mb-4">
+                  <div key={entry.id} className="bg-[#1a1a1a] p-3 sm:p-5 rounded-xl border border-slate-800 transition-all">
+                    <div className="flex flex-col sm:flex-row justify-between items-start mb-3 sm:mb-4 gap-2">
                       <div>
-                        <h3 className="text-sm font-semibold text-slate-200 flex items-center">
-                          <Database className="w-4 h-4 mr-2 text-emerald-500" />
+                        <h3 className="text-xs sm:text-sm font-semibold text-slate-200 flex items-center">
+                          <Database className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 text-emerald-500" />
                           {entry.id}
                         </h3>
-                        <p className="text-xs text-slate-500 mt-1">
+                        <p className="text-[10px] sm:text-xs text-slate-500 mt-1">
                           {new Date(entry.timestamp).toLocaleString()}
                         </p>
                       </div>
                       {entry.riskLevel && (
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${getRiskColor(entry.riskLevel).bg} ${getRiskColor(entry.riskLevel).text}`}>
+                        <span className={`px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-bold ${getRiskColor(entry.riskLevel).bg} ${getRiskColor(entry.riskLevel).text}`}>
                           {entry.riskLevel}
                         </span>
                       )}
@@ -1764,10 +1765,10 @@ export default function App() {
                     
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs text-slate-400 font-medium">Shards ({entry.shards.length}):</p>
+                        <p className="text-[10px] sm:text-xs text-slate-400 font-medium">Shards ({entry.shards.length}):</p>
                         <button 
                           onClick={() => setExpandedLockerId(expandedLockerId === entry.id ? null : entry.id)}
-                          className="text-xs text-slate-400 hover:text-slate-200 flex items-center transition-colors"
+                          className="text-[10px] sm:text-xs text-slate-400 hover:text-slate-200 flex items-center transition-colors"
                         >
                           {expandedLockerId === entry.id ? (
                             <><ChevronUp className="w-3 h-3 mr-1" /> Hide Details</>
@@ -1779,14 +1780,14 @@ export default function App() {
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {entry.shards.slice(0, expandedLockerId === entry.id ? undefined : 2).map((shard: any) => (
-                          <div key={shard.id} className="p-2 bg-slate-900 border border-slate-800 rounded flex items-center justify-between">
-                            <span className="text-[10px] font-mono text-slate-400">{shard.id}</span>
-                            <span className="text-[10px] font-mono text-emerald-500/70 truncate ml-2">{shard.hash}</span>
+                          <div key={shard.id} className="p-1.5 sm:p-2 bg-slate-900 border border-slate-800 rounded flex items-center justify-between">
+                            <span className="text-[9px] sm:text-[10px] font-mono text-slate-400">{shard.id}</span>
+                            <span className="text-[9px] sm:text-[10px] font-mono text-emerald-500/70 truncate ml-2">{shard.hash}</span>
                           </div>
                         ))}
                       </div>
                       {expandedLockerId !== entry.id && entry.shards.length > 2 && (
-                        <p className="text-[10px] text-slate-500 italic">+ {entry.shards.length - 2} more shards</p>
+                        <p className="text-[9px] sm:text-[10px] text-slate-500 italic">+ {entry.shards.length - 2} more shards</p>
                       )}
                     </div>
 
@@ -1844,18 +1845,18 @@ export default function App() {
 
       {/* Full Ledger Modal */}
       {isLedgerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#111] border border-slate-800 rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
-            <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-slate-200 flex items-center">
-                <Database className="w-5 h-5 mr-2 text-emerald-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4">
+          <div className="bg-[#111] border border-slate-800 rounded-xl w-full max-w-3xl max-h-[90vh] sm:max-h-[80vh] flex flex-col">
+            <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center">
+              <h2 className="text-lg sm:text-xl font-semibold text-slate-200 flex items-center">
+                <Database className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-emerald-400" />
                 Full ZeddProof Ledger
               </h2>
               <button onClick={() => setIsLedgerOpen(false)} className="text-slate-400 hover:text-white transition-colors">
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            <div className="p-6 overflow-y-auto flex-1 space-y-3">
+            <div className="p-3 sm:p-6 overflow-y-auto flex-1 space-y-2 sm:space-y-3">
               {/* Generate a larger list for the full ledger view based on existing attestations */}
               {[...attestations, ...Array.from({ length: 15 }).map((_, i) => ({
                 id: `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`,
@@ -1863,19 +1864,19 @@ export default function App() {
                 type: i % 3 === 0 ? 'Inertial Shard' : 'Atmospheric Shard',
                 verified: true
               }))].map((att, i) => (
-                <div key={i} className="p-4 rounded-lg bg-[#1a1a1a] border border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-slate-900 rounded-md border border-slate-800">
-                      <Terminal className="w-5 h-5 text-emerald-500" />
+                <div key={i} className="p-3 sm:p-4 rounded-lg bg-[#1a1a1a] border border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center space-x-3 sm:space-x-4">
+                    <div className="p-2 sm:p-3 bg-slate-900 rounded-md border border-slate-800">
+                      <Terminal className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
                     </div>
                     <div>
-                      <p className="text-sm font-mono text-slate-300">{att.id}</p>
-                      <p className="text-xs text-slate-500 mt-1">{att.type} • {att.time}</p>
+                      <p className="text-xs sm:text-sm font-mono text-slate-300">{att.id}</p>
+                      <p className="text-[10px] sm:text-xs text-slate-500 mt-1">{att.type} • {att.time}</p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2 text-emerald-500 text-sm font-medium">
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Verified</span>
+                  <div className="flex items-center space-x-1 sm:space-x-2 text-emerald-500 text-[10px] sm:text-sm font-medium">
+                    <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span className="hidden xs:inline">Verified</span>
                   </div>
                 </div>
               ))}
@@ -1886,21 +1887,21 @@ export default function App() {
 
       {/* Export Modal */}
       {isExportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4">
           <div className="bg-[#111] border border-slate-800 rounded-xl w-full max-w-md flex flex-col">
-            <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-slate-200 flex items-center">
-                <Download className="w-5 h-5 mr-2 text-emerald-400" />
+            <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center">
+              <h2 className="text-base sm:text-lg font-semibold text-slate-200 flex items-center">
+                <Download className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-emerald-400" />
                 Export Historical Data
               </h2>
               <button onClick={() => setIsExportModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               <div>
-                <h3 className="text-sm font-medium text-slate-300 mb-3">Select Metrics to Export</h3>
-                <div className="space-y-3">
+                <h3 className="text-xs sm:text-sm font-medium text-slate-300 mb-3">Select Metrics to Export</h3>
+                <div className="space-y-2 sm:space-y-3">
                   <label className="flex items-center space-x-3 cursor-pointer">
                     <input 
                       type="checkbox" 
@@ -1908,7 +1909,7 @@ export default function App() {
                       onChange={(e) => setExportMetrics(prev => ({ ...prev, temp: e.target.checked }))}
                       className="form-checkbox h-4 w-4 text-emerald-500 rounded border-slate-700 bg-slate-900 focus:ring-emerald-500 focus:ring-offset-slate-900"
                     />
-                    <span className="text-sm text-slate-400 flex items-center"><Thermometer className="w-4 h-4 mr-2 text-rose-400" /> Temperature</span>
+                    <span className="text-xs sm:text-sm text-slate-400 flex items-center"><Thermometer className="w-4 h-4 mr-2 text-rose-400" /> Temperature</span>
                   </label>
                   <label className="flex items-center space-x-3 cursor-pointer">
                     <input 
@@ -1917,7 +1918,7 @@ export default function App() {
                       onChange={(e) => setExportMetrics(prev => ({ ...prev, humidity: e.target.checked }))}
                       className="form-checkbox h-4 w-4 text-emerald-500 rounded border-slate-700 bg-slate-900 focus:ring-emerald-500 focus:ring-offset-slate-900"
                     />
-                    <span className="text-sm text-slate-400 flex items-center"><Droplets className="w-4 h-4 mr-2 text-blue-400" /> Humidity</span>
+                    <span className="text-xs sm:text-sm text-slate-400 flex items-center"><Droplets className="w-4 h-4 mr-2 text-blue-400" /> Humidity</span>
                   </label>
                   <label className="flex items-center space-x-3 cursor-pointer">
                     <input 
@@ -1926,7 +1927,7 @@ export default function App() {
                       onChange={(e) => setExportMetrics(prev => ({ ...prev, pressure: e.target.checked }))}
                       className="form-checkbox h-4 w-4 text-emerald-500 rounded border-slate-700 bg-slate-900 focus:ring-emerald-500 focus:ring-offset-slate-900"
                     />
-                    <span className="text-sm text-slate-400 flex items-center"><Wind className="w-4 h-4 mr-2 text-slate-400" /> Pressure</span>
+                    <span className="text-xs sm:text-sm text-slate-400 flex items-center"><Wind className="w-4 h-4 mr-2 text-slate-400" /> Pressure</span>
                   </label>
                   <label className="flex items-center space-x-3 cursor-pointer">
                     <input 
@@ -1935,31 +1936,31 @@ export default function App() {
                       onChange={(e) => setExportMetrics(prev => ({ ...prev, precipitation: e.target.checked }))}
                       className="form-checkbox h-4 w-4 text-emerald-500 rounded border-slate-700 bg-slate-900 focus:ring-emerald-500 focus:ring-offset-slate-900"
                     />
-                    <span className="text-sm text-slate-400 flex items-center"><CloudRain className="w-4 h-4 mr-2 text-blue-300" /> Precipitation</span>
+                    <span className="text-xs sm:text-sm text-slate-400 flex items-center"><CloudRain className="w-4 h-4 mr-2 text-blue-300" /> Precipitation</span>
                   </label>
                 </div>
               </div>
               
-              <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800">
-                <p className="text-xs text-slate-400">
+              <div className="bg-slate-900/50 p-3 sm:p-4 rounded-lg border border-slate-800">
+                <p className="text-[10px] sm:text-xs text-slate-400">
                   Exporting data for the selected range: <strong className="text-emerald-400">{historicalRange.toUpperCase()}</strong>.
                   The CSV will include {historicalData.length} data points.
                 </p>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-800 flex justify-end space-x-3">
+            <div className="p-4 sm:p-6 border-t border-slate-800 flex justify-end space-x-3">
               <button 
                 onClick={() => setIsExportModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button 
                 onClick={exportHistoricalToCSV}
                 disabled={!exportMetrics.temp && !exportMetrics.humidity && !exportMetrics.pressure && !exportMetrics.precipitation}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors flex items-center"
               >
-                <Download className="w-4 h-4 mr-2" />
+                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                 Download CSV
               </button>
             </div>
