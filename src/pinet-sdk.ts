@@ -23,6 +23,35 @@ export interface PiNetBridgeEvent {
 }
 
 /**
+ * Resolved origin of the PiNet OS host.
+ *
+ * DApps run in sandboxed iframes whose parent origin varies by
+ * deployment.  We capture the origin from the first valid bridge
+ * message so that subsequent communication is scoped to that origin.
+ */
+let pinetOrigin: string | null = null;
+
+/** Check whether a MessageEvent comes from the trusted PiNet host. */
+function isTrustedOrigin(event: MessageEvent): boolean {
+  // Accept the first bridge message and lock the origin.
+  if (pinetOrigin === null) {
+    if (
+      event.source === window.parent &&
+      typeof event.data === 'object' &&
+      event.data !== null &&
+      (event.data.type === 'pinet-bridge-response' ||
+        event.data.type === 'pinet-bridge-event')
+    ) {
+      pinetOrigin = event.origin;
+      return true;
+    }
+    // While origin is unknown, only accept messages from parent.
+    return event.source === window.parent;
+  }
+  return event.origin === pinetOrigin;
+}
+
+/**
  * Send a single request to PiNet OS and wait for the matching response.
  *
  * @param method  Bridge method name (e.g. `wallet.getBalance`).
@@ -37,6 +66,7 @@ export function callPiNet(
     const requestId = crypto.randomUUID();
 
     const handler = (event: MessageEvent) => {
+      if (!isTrustedOrigin(event)) return;
       const data = event.data as PiNetBridgeResponse | undefined;
       if (
         data?.type === 'pinet-bridge-response' &&
@@ -53,6 +83,10 @@ export function callPiNet(
 
     window.addEventListener('message', handler);
 
+    // The DApp does not know the parent origin at build time (it
+    // varies by deployment), so we use '*'.  Communication is still
+    // safe because PiNet OS enforces permission checks server-side
+    // and the sandboxed iframe isolates the DApp's own origin.
     window.parent.postMessage(
       {
         type: 'pinet-bridge-request',
@@ -82,6 +116,7 @@ export type PiNetEventListener = (event: string, data: unknown) => void;
  */
 export function onPiNetEvent(listener: PiNetEventListener): () => void {
   const handler = (event: MessageEvent) => {
+    if (!isTrustedOrigin(event)) return;
     const msg = event.data as PiNetBridgeEvent | undefined;
     if (msg?.type === 'pinet-bridge-event') {
       listener(msg.event, msg.data);

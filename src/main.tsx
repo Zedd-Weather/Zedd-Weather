@@ -4,12 +4,15 @@ import App from './App.tsx';
 import './index.css';
 import {isRunningInPiNet, onPiNetEvent} from './pinet-sdk';
 
-// When running inside PiNet OS, listen for bridge events and forward
-// them as DOM CustomEvents so any component can subscribe.
+// When running inside PiNet OS, forward bridge events as DOM
+// CustomEvents so any React component can subscribe via
+// window.addEventListener('pinet', ...).
+// The listener is intentionally app-global and lives until page unload.
 if (isRunningInPiNet()) {
-  onPiNetEvent((event, data) => {
+  const cleanup = onPiNetEvent((event, data) => {
     window.dispatchEvent(new CustomEvent('pinet', {detail: {event, data}}));
   });
+  window.addEventListener('unload', cleanup);
 }
 
 createRoot(document.getElementById('root')!).render(
