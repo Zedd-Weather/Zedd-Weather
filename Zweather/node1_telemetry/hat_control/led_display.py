@@ -26,7 +26,10 @@ _RISK_COLOURS = {
     "green": GREEN,
     "amber": AMBER,
     "red": RED,
-    "black": WHITE,  # white-on-black for readability in "black" risk mode
+    # "Black" is the most severe risk level (Green → Amber → Red → Black).
+    # Filling the matrix with literal black would look identical to "off",
+    # so we use white to ensure the alert is visually distinct and unmissable.
+    "black": WHITE,
 }
 
 

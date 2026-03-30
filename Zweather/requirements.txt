@@ -26,5 +26,5 @@ pyserial>=3.5
 
 # AI / Orchestration (Node 2)
 google-genai>=1.0.0
-aiohttp>=3.9.0
+aiohttp>=3.13.3
 python-dotenv>=1.0.0
