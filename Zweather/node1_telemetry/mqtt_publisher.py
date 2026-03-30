@@ -1,75 +1,126 @@
 """
 Node 1: Telemetry Publisher
-Acquires micro-climate telemetry via Sense HAT and publishes to MQTT.
+Acquires micro-climate telemetry from all enabled sensors (Sense HAT, GPIO
+rain gauge, VEML6075 UV, Enviro+, Modbus RS485) and publishes the aggregated
+payload to MQTT.  Also drives the Sense HAT LED display and GPIO alarm
+outputs based on configurable thresholds.
+
+Usage:
+    python -m Zweather.node1_telemetry.mqtt_publisher
 """
 import time
 import json
 import logging
 import socket
+
 import paho.mqtt.client as mqtt
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+from Zweather.node1_telemetry import config
+from Zweather.node1_telemetry.sensors.sensor_manager import SensorManager
+from Zweather.node1_telemetry.hat_control.led_display import LEDDisplay
+from Zweather.node1_telemetry.hat_control.alarm import AlarmController
 
-MQTT_BROKER = "10.0.0.16" # Node 2 IP
-MQTT_PORT = 1883
-MQTT_TOPIC = "zedd/telemetry/node1"
-PUBLISH_INTERVAL = 5.0 # seconds
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
-try:
-    from sense_hat import SenseHat
-    sense = SenseHat()
-except ImportError:
-    logging.warning("Sense HAT not found. Using mock data generator.")
-    class MockSenseHat:
-        def get_temperature(self): return 24.5
-        def get_pressure(self): return 1012.1
-        def get_humidity(self): return 45.2
-    sense = MockSenseHat()
 
+# ── MQTT callbacks ────────────────────────────────────────────────────
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        logging.info("Connected to MQTT Broker.")
+        logger.info("Connected to MQTT Broker.")
     else:
-        logging.error(f"Failed to connect, return code {rc}")
+        logger.error("Failed to connect, return code %d", rc)
+
 
 def on_disconnect(client, userdata, rc):
-    logging.warning("Disconnected from MQTT Broker. Attempting reconnect...")
+    logger.warning("Disconnected from MQTT Broker. Attempting reconnect …")
 
+
+# ── Risk level helper ─────────────────────────────────────────────────
+def _compute_risk_level(telemetry: dict) -> str:
+    """Derive a simple risk colour from the telemetry payload."""
+    temp = telemetry.get("temperature_c")
+    wind = telemetry.get("wind_speed_ms")
+    uv = telemetry.get("uv_index")
+    pm25 = telemetry.get("pm2_5_ug_m3")
+
+    if temp is not None and (temp > 40 or temp < -5):
+        return "red"
+    if wind is not None and wind > 25:
+        return "red"
+    if temp is not None and (temp > config.ALERT_TEMP_HIGH_C or temp < config.ALERT_TEMP_LOW_C):
+        return "amber"
+    if wind is not None and wind > config.ALERT_WIND_SPEED_MS:
+        return "amber"
+    if uv is not None and uv > config.ALERT_UV_INDEX:
+        return "amber"
+    if pm25 is not None and pm25 > config.ALERT_AQI:
+        return "amber"
+    return "green"
+
+
+# ── Main entry point ──────────────────────────────────────────────────
 def main():
-    client = mqtt.Client(client_id="node1_telemetry", clean_session=False)
+    # 1. Initialise sensors
+    sensor_mgr = SensorManager()
+    sensor_mgr.initialize()
+
+    # 2. Initialise HAT display and alarm
+    led = LEDDisplay(sensor_mgr.sense_hat)
+    alarm = AlarmController()
+    alarm.initialize()
+
+    # Show startup colour
+    led.show_risk_level("green")
+
+    # 3. Connect to MQTT broker
+    client = mqtt.Client(client_id=config.MQTT_CLIENT_ID, clean_session=False)
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
 
     while True:
         try:
-            client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
+            client.connect(config.MQTT_BROKER, config.MQTT_PORT, keepalive=60)
             client.loop_start()
             break
-        except (socket.error, ConnectionRefusedError) as e:
-            logging.error(f"MQTT connection failed: {e}. Retrying in 5s...")
+        except (socket.error, ConnectionRefusedError) as exc:
+            logger.error("MQTT connection failed: %s. Retrying in 5 s …", exc)
             time.sleep(5)
 
+    # 4. Publish loop
     try:
         while True:
-            payload = {
-                "timestamp": time.time(),
-                "temperature_c": round(sense.get_temperature(), 2),
-                "pressure_hpa": round(sense.get_pressure(), 2),
-                "humidity_pct": round(sense.get_humidity(), 2)
-            }
-            
-            result = client.publish(MQTT_TOPIC, json.dumps(payload), qos=1)
+            payload = sensor_mgr.read_all()
+
+            # Evaluate alarms
+            alarm.evaluate(payload)
+
+            # Update LED risk display
+            risk = _compute_risk_level(payload)
+            led.show_risk_level(risk)
+
+            # Publish
+            result = client.publish(
+                config.MQTT_TOPIC, json.dumps(payload), qos=1
+            )
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                logging.debug(f"Published: {payload}")
+                logger.debug("Published: %s", payload)
             else:
-                logging.error("Failed to publish telemetry.")
-            
-            time.sleep(PUBLISH_INTERVAL)
+                logger.error("Failed to publish telemetry.")
+
+            time.sleep(config.PUBLISH_INTERVAL)
     except KeyboardInterrupt:
-        logging.info("Shutting down telemetry node.")
+        logger.info("Shutting down telemetry node.")
     finally:
+        led.clear()
+        alarm.cleanup()
+        sensor_mgr.cleanup()
         client.loop_stop()
         client.disconnect()
+
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,30 @@
+# Zedd Weather - Python Dependencies
+# Node 1 (Telemetry) and Node 2 (Orchestration)
+
+# MQTT
+paho-mqtt>=1.6.1,<2.0
+
+# Sense HAT
+sense-hat>=2.6.0
+
+# GPIO access (Raspberry Pi)
+RPi.GPIO>=0.7.1
+gpiozero>=2.0
+
+# I2C / SMBus (for UV sensor and other I2C peripherals)
+smbus2>=0.4.3
+
+# Pimoroni Enviro+ sensors
+enviroplus>=0.0.6
+pimoroni-bme280>=1.0.0
+pimoroni-ltr559>=1.0.0
+pms5003>=1.0.0
+
+# Modbus / RS485 industrial sensors
+pymodbus>=3.6.0
+pyserial>=3.5
+
+# AI / Orchestration (Node 2)
+google-genai>=1.0.0
+aiohttp>=3.13.3
+python-dotenv>=1.0.0
