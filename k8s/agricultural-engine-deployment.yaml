@@ -1,0 +1,97 @@
+# =============================================================================
+# Agricultural Intelligence Engine – Deployment
+# Runs on pinet-alpha (node with label storage=nvme).
+# Consumes sensor data from InfluxDB and produces crop-model insights.
+# =============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agricultural-engine
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/name: agricultural-engine
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: agricultural-engine
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: agricultural-engine
+  template:
+    metadata:
+      labels:
+        app: agricultural-engine
+        app.kubernetes.io/part-of: zedd-weather
+    spec:
+      nodeSelector:
+        storage: nvme
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+
+      containers:
+        - name: agricultural-engine
+          # Use the same edge image which includes the Zweather package;
+          # a dedicated agricultural engine image can replace this once built.
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+
+          command: ["python", "-m", "Zweather.agricultural_engine"]
+
+          # Agricultural thresholds from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: agricultural-config
+            - configMapRef:
+                name: zedd-weather-config
+
+          env:
+            - name: INFLUXDB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-credentials
+                  key: INFLUXDB_TOKEN
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: api-credentials
+                  key: GEMINI_API_KEY
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import sys; sys.exit(0)"
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 3
+
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import sys; sys.exit(0)"
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3

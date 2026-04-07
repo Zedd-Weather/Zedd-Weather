@@ -1,0 +1,102 @@
+# =============================================================================
+# Zedd-Weather – Docker Compose (local development / integration testing)
+# =============================================================================
+# Usage:
+#   cp .env.example .env   # fill in secrets
+#   docker compose up -d
+#
+# Services exposed on localhost:
+#   InfluxDB  → http://localhost:8086
+#   Grafana   → http://localhost:3000
+# =============================================================================
+
+version: "3.9"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # InfluxDB 2.7 – time-series database for telemetry data
+  # ---------------------------------------------------------------------------
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: zedd-influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE:     ${DOCKER_INFLUXDB_INIT_MODE:-setup}
+      DOCKER_INFLUXDB_INIT_USERNAME: ${DOCKER_INFLUXDB_INIT_USERNAME:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${DOCKER_INFLUXDB_INIT_PASSWORD:-changeme123}
+      DOCKER_INFLUXDB_INIT_ORG:      ${DOCKER_INFLUXDB_INIT_ORG:-zedd-weather}
+      DOCKER_INFLUXDB_INIT_BUCKET:   ${DOCKER_INFLUXDB_INIT_BUCKET:-telemetry}
+      DOCKER_INFLUXDB_INIT_TOKEN:    ${INFLUXDB_TOKEN:-dev-token-changeme}
+      DOCKER_INFLUXDB_INIT_RETENTION: "30d"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Grafana – dashboards and alerting
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: zedd-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER:     ${GF_SECURITY_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-changeme123}
+      GF_SERVER_ROOT_URL:         ${GF_SERVER_ROOT_URL:-http://localhost:3000}
+      GF_INSTALL_PLUGINS:         "grafana-clock-panel,grafana-simple-json-datasource"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      influxdb:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Zedd-Weather Edge Collector – sensor reader + InfluxDB writer
+  # ---------------------------------------------------------------------------
+  zedd-weather-edge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Build for the host platform in local dev; CI overrides with --platform
+      # linux/arm64 via QEMU for production image creation.
+    container_name: zedd-edge
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      INFLUXDB_URL:    http://influxdb:8086
+      INFLUXDB_ORG:    ${DOCKER_INFLUXDB_INIT_ORG:-zedd-weather}
+      INFLUXDB_BUCKET: ${DOCKER_INFLUXDB_INIT_BUCKET:-telemetry}
+      INFLUXDB_TOKEN:  ${INFLUXDB_TOKEN:-dev-token-changeme}
+      PUBLISH_INTERVAL:       ${PUBLISH_INTERVAL:-10.0}
+      SENSE_HAT_ENABLED:      ${SENSE_HAT_ENABLED:-false}
+      SENSE_HAT_TEMP_OFFSET:  ${SENSE_HAT_TEMP_OFFSET:-2.0}
+      NODE_NAME:              ${NODE_NAME:-dev-node}
+      SQLITE_DB_PATH:         /tmp/zedd_buffer.db
+      LOG_LEVEL:              ${LOG_LEVEL:-INFO}
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    # In production the pod runs privileged with /dev/i2c-1 mounted.
+    # Uncomment below if testing against real hardware locally:
+    # devices:
+    #   - /dev/i2c-1:/dev/i2c-1
+    # privileged: true
+
+# ---------------------------------------------------------------------------
+# Named volumes (persist data between container restarts)
+# ---------------------------------------------------------------------------
+volumes:
+  influxdb-data:
+    driver: local
+  grafana-data:
+    driver: local

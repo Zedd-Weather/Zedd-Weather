@@ -1,0 +1,117 @@
+# =============================================================================
+# Open WebUI – Deployment and Service
+# Provides a browser-based chat UI connected to Ollama on pinet-sigma
+# (10.0.0.20:11434).
+# Namespace: zedd-weather
+# Scheduled on nodes with label: storage=nvme
+# =============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: open-webui
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/name: open-webui
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: ai-frontend
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: open-webui
+  template:
+    metadata:
+      labels:
+        app: open-webui
+        app.kubernetes.io/part-of: zedd-weather
+    spec:
+      nodeSelector:
+        storage: nvme
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+
+      containers:
+        - name: open-webui
+          image: ghcr.io/open-webui/open-webui:main
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+          env:
+            # Point at the Ollama instance running on pinet-sigma
+            - name: OLLAMA_BASE_URL
+              value: "http://10.0.0.20:11434"
+            # Disable telemetry
+            - name: SCARF_NO_ANALYTICS
+              value: "true"
+            - name: DO_NOT_TRACK
+              value: "true"
+            - name: ANONYMIZED_TELEMETRY
+              value: "false"
+
+          volumeMounts:
+            - name: webui-data
+              mountPath: /app/backend/data
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      volumes:
+        # emptyDir is sufficient for session state in a single-replica deployment.
+        # Replace with a PVC if persistence across restarts is required.
+        - name: webui-data
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: open-webui
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/name: open-webui
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: ai-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: open-webui
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP

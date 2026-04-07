@@ -28,3 +28,10 @@ pyserial>=3.5
 google-genai>=1.0.0
 aiohttp>=3.13.3
 python-dotenv>=1.0.0
+
+# InfluxDB client (Node 1 edge collector + agricultural engine)
+influxdb-client>=3.0.0
+
+# Testing
+pytest>=8.0.0
+pytest-mock>=3.0.0
