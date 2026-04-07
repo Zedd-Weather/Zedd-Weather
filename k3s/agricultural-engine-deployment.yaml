@@ -40,17 +40,17 @@ spec:
 
       containers:
         - name: agricultural-engine
-          # TODO: Replace with a custom image that has the Zweather package and
-          # its dependencies pre-installed.  Use ghcr.io/williamluke/zedd-weather-edge
-          # (which bundles the Zweather package) until a dedicated agricultural
-          # engine image is built.  python:3.12-slim alone does not include
-          # application code and will fail to start.
+          # Uses the shared zedd-weather-edge image (which bundles the full
+          # Zweather package) with an explicit command override to run the
+          # agricultural analysis entry-point instead of the default edge
+          # collector.  Replace with a dedicated
+          # ghcr.io/williamluke/zedd-weather-agricultural:latest image once
+          # the agricultural service grows to require different system deps.
           image: ghcr.io/williamluke/zedd-weather-edge:latest
           imagePullPolicy: Always
 
-          # Runs the base edge collector; extend with Zweather/agricultural_engine.py
-          # for dedicated crop-model logic and update this command accordingly.
-          command: ["python", "-m", "Zweather.app"]
+          # Entry-point that runs crop-model analysis and irrigation scheduling.
+          command: ["python", "-m", "Zweather.agricultural.engine"]
 
           # Agricultural thresholds from ConfigMap
           envFrom:
