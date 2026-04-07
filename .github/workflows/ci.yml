@@ -1,0 +1,234 @@
+name: "CI – Lint, Test & Build"
+
+on:
+  push:
+    paths:
+      - "Zweather/**"
+      - "Dockerfile"
+      - ".github/workflows/ci.yml"
+      - "src/**"
+  pull_request:
+    branches:
+      - main
+
+env:
+  KUBECTL_VERSION: "v1.29.0"
+
+# Restrict default token permissions; each job opts in to what it needs.
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Python linting
+  # ---------------------------------------------------------------------------
+  lint-python:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: Zweather/requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install paho-mqtt influxdb-client python-dotenv google-genai aiohttp \
+            pymodbus pyserial smbus2 requests flake8 mypy pytest pytest-mock
+
+      - name: Flake8
+        run: |
+          flake8 Zweather/ --max-line-length=120 --extend-ignore=E203,W503,E501
+
+      - name: Mypy
+        run: |
+          mypy Zweather/app.py Zweather/agricultural/engine.py Zweather/alerting/rules.py \
+            --ignore-missing-imports
+
+  # ---------------------------------------------------------------------------
+  # Python tests
+  # ---------------------------------------------------------------------------
+  test-python:
+    runs-on: ubuntu-latest
+    needs: lint-python
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install paho-mqtt influxdb-client python-dotenv google-genai aiohttp \
+            pymodbus pyserial smbus2 requests flake8 mypy pytest pytest-mock
+
+      - name: Run tests
+        run: pytest Zweather/tests/ -v --tb=short
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # TypeScript linting
+  # ---------------------------------------------------------------------------
+  lint-typescript:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: TypeScript lint
+        run: npm run lint
+
+  # ---------------------------------------------------------------------------
+  # Docker build
+  # ---------------------------------------------------------------------------
+  build-docker:
+    runs-on: ubuntu-latest
+    needs: [lint-python, lint-typescript]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/zedd-weather-edge
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/arm64,linux/amd64
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # ---------------------------------------------------------------------------
+  # K3s manifest validation
+  # ---------------------------------------------------------------------------
+  validate-k3s-manifests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/${{ env.KUBECTL_VERSION }}/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Validate namespace manifest
+        run: kubectl apply --dry-run=client -f k3s/namespace.yaml
+
+      - name: Validate configmap manifest
+        run: kubectl apply --dry-run=client -f k3s/configmap.yaml
+
+      - name: Validate influxdb manifest
+        run: kubectl apply --dry-run=client -f k3s/influxdb.yaml
+
+      - name: Validate grafana manifest
+        run: kubectl apply --dry-run=client -f k3s/grafana.yaml
+
+      - name: Validate open-webui manifest
+        run: kubectl apply --dry-run=client -f k3s/open-webui.yaml
+
+      - name: Validate zedd-weather-edge-deployment manifest
+        run: kubectl apply --dry-run=client -f k3s/zedd-weather-edge-deployment.yaml
+
+      - name: Validate agricultural-engine-deployment manifest
+        run: kubectl apply --dry-run=client -f k3s/agricultural-engine-deployment.yaml
+
+  # ---------------------------------------------------------------------------
+  # Deploy (main branch only)
+  # ---------------------------------------------------------------------------
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/${{ env.KUBECTL_VERSION }}/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Apply namespace
+        run: kubectl apply -f k3s/namespace.yaml
+
+      - name: Apply configmap
+        run: kubectl apply -f k3s/configmap.yaml
+
+      - name: Apply secrets
+        run: kubectl apply -f k3s/secrets.yaml || true
+
+      - name: Apply core services
+        run: |
+          kubectl apply -f k3s/influxdb.yaml
+          kubectl apply -f k3s/grafana.yaml
+          kubectl apply -f k3s/open-webui.yaml
+
+      - name: Apply edge deployment
+        run: kubectl apply -f k3s/zedd-weather-edge-deployment.yaml
+
+      - name: Apply agricultural engine deployment
+        run: kubectl apply -f k3s/agricultural-engine-deployment.yaml
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/zedd-weather-edge \
+            -n zedd-weather --timeout=120s

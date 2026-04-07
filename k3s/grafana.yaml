@@ -1,0 +1,130 @@
+# =============================================================================
+# Grafana – PersistentVolumeClaim, Deployment, and Service
+# Namespace: zedd-weather
+# Scheduled on nodes with label: storage=nvme
+# =============================================================================
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: grafana
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: grafana
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+        app.kubernetes.io/part-of: zedd-weather
+    spec:
+      nodeSelector:
+        storage: nvme
+
+      securityContext:
+        # Grafana official image runs as UID 472
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+        runAsNonRoot: true
+
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.1.0
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: grafana-config
+
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-credentials
+                  key: GF_SECURITY_ADMIN_PASSWORD
+
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/grafana
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: grafana-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: grafana
+spec:
+  type: ClusterIP
+  selector:
+    app: grafana
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
