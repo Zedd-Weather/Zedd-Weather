@@ -1,0 +1,110 @@
+# =============================================================================
+# Zedd-Weather ConfigMaps
+# All objects are in the zedd-weather namespace.
+# =============================================================================
+
+---
+# InfluxDB initialisation settings (non-secret)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-config
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: database
+data:
+  DOCKER_INFLUXDB_INIT_MODE:      "setup"
+  DOCKER_INFLUXDB_INIT_ORG:       "zedd-weather"
+  DOCKER_INFLUXDB_INIT_BUCKET:    "telemetry"
+  DOCKER_INFLUXDB_INIT_RETENTION: "30d"
+
+---
+# Edge collector runtime configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zedd-weather-config
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: edge-collector
+data:
+  INFLUXDB_URL:            "http://influxdb.zedd-weather.svc.cluster.local:8086"
+  INFLUXDB_ORG:            "zedd-weather"
+  INFLUXDB_BUCKET:         "telemetry"
+  SENSE_HAT_ENABLED:       "true"
+  SENSE_HAT_TEMP_OFFSET:   "2.0"
+  PUBLISH_INTERVAL:        "10.0"
+  SQLITE_DB_PATH:          "/tmp/zedd_buffer.db"
+  LOG_LEVEL:               "INFO"
+  # Alert thresholds
+  ALERT_TEMP_HIGH_C:       "35.0"
+  ALERT_TEMP_LOW_C:        "0.0"
+  ALERT_WIND_SPEED_MS:     "20.0"
+  ALERT_UV_INDEX:          "8.0"
+  ALERT_AQI:               "150.0"
+  # AI / Ollama (local LLM sidecar on pinet-sigma)
+  OLLAMA_BASE_URL:         "http://10.0.0.20:11434"
+
+---
+# Grafana runtime configuration (non-secret)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: grafana
+data:
+  GF_SECURITY_ADMIN_USER:  "admin"
+  GF_SERVER_ROOT_URL:      "http://grafana.zedd-weather.svc.cluster.local:3000"
+  GF_INSTALL_PLUGINS:      "grafana-clock-panel,grafana-simple-json-datasource"
+
+---
+# Agricultural Intelligence Engine thresholds
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agricultural-config
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: agricultural-engine
+data:
+  # Temperature extremes
+  FROST_THRESHOLD_C:                  "-2.0"
+  HEAT_STRESS_THRESHOLD_C:            "35.0"
+  # Humidity / irrigation
+  DROUGHT_HUMIDITY_THRESHOLD:         "30.0"
+  OPTIMAL_IRRIGATION_INTERVAL_HOURS:  "24"
+  # Wind thresholds
+  HIGH_WIND_SPRAY_THRESHOLD_MS:       "5.0"
+  STORM_WIND_THRESHOLD_MS:            "20.0"
+  # UV / solar radiation
+  HIGH_UV_THRESHOLD:                  "7.0"
+  # Soil / crop model
+  OPTIMAL_TEMP_MIN_C:                 "15.0"
+  OPTIMAL_TEMP_MAX_C:                 "28.0"
+  OPTIMAL_HUMIDITY_MIN:               "50.0"
+  OPTIMAL_HUMIDITY_MAX:               "80.0"
+  # Growing degree days base temperature (°C)
+  GDD_BASE_TEMP_C:                    "10.0"
+
+---
+# Alert channel / notification configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alerts-config
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: alerts
+data:
+  # Alertmanager / webhook receiver endpoint (configure to suit your stack)
+  ALERT_WEBHOOK_URL:      "http://alertmanager.monitoring.svc.cluster.local:9093/api/v2/alerts"
+  ALERT_CHANNEL:          "webhook"
+  # Minimum seconds between repeated alerts for the same condition
+  ALERT_COOLDOWN_SECONDS: "300"

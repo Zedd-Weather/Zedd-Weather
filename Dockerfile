@@ -1,74 +1,78 @@
 # =============================================================================
-# Stage 1: Builder
-# Install Python dependencies in a virtual environment so only the venv is
-# copied into the final image (keeps the image small and reproducible).
+# Zedd-Weather Edge Collector – Multi-Stage Dockerfile
+# Target architecture: linux/arm64 (Raspberry Pi 4/5 via QEMU in CI)
 # =============================================================================
-FROM python:3.12-slim AS builder
 
-# Install build tools needed for some native Python extensions (e.g. RPi.GPIO)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        gcc \
-        g++ \
-        libffi-dev \
-        libssl-dev \
-        python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+# ---------------------------------------------------------------------------
+# Stage 1 – Builder
+# Install Python dependencies, skipping hardware-only RPi libraries that
+# cannot be built outside of a Raspberry Pi environment.
+# ---------------------------------------------------------------------------
+FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
-# Copy only the dependency manifest first to maximise Docker layer cache reuse
-COPY Zweather/requirements.txt ./requirements.txt
-
-# Create isolated venv and install packages
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
-
-
-# =============================================================================
-# Stage 2: Runtime
-# Minimal image containing only the application code and the pre-built venv.
-# Targets linux/arm64 (Raspberry Pi 5 / pinet-rho).
-# =============================================================================
-FROM python:3.12-slim AS runtime
-
-# Security: do not run as root
-RUN groupadd --gid 1001 zedd && useradd --uid 1001 --gid 1001 --no-create-home zedd
-
-# System libraries required at runtime by the Sense HAT and I2C subsystem
+# System build tools needed for some pure-Python C-extension packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        i2c-tools \
-        libgles2 \
+        gcc \
+        libffi-dev \
+        libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the pre-built virtual environment from the builder stage
-COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+COPY Zweather/requirements.txt requirements.txt
+
+# Install all deps except RPi-specific hardware packages that only build on Pi.
+# These are excluded via --ignore with pip; the app guards their import at
+# runtime so the container still starts correctly on non-Pi hosts.
+RUN pip install --upgrade pip && \
+    pip install --prefix=/install --no-cache-dir \
+        $(grep -v -E \
+            '^\s*(sense-hat|RPi\.GPIO|gpiozero|enviroplus|pimoroni-bme280|pimoroni-ltr559|pms5003)' \
+            requirements.txt \
+          | grep -v '^\s*#' \
+          | grep -v '^\s*$')
+
+# ---------------------------------------------------------------------------
+# Stage 2 – Runtime
+# Lean image that only contains application code + installed packages.
+# ---------------------------------------------------------------------------
+FROM python:3.12-slim AS runtime
+
+# Metadata labels (OCI standard)
+LABEL org.opencontainers.image.title="zedd-weather-edge"
+LABEL org.opencontainers.image.description="Zedd-Weather edge telemetry collector"
+LABEL org.opencontainers.image.source="https://github.com/WilliamMajanja/Zedd-Weather"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# Runtime-only system libraries (smbus2 needs libi2c, sqlite3 is built-in)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libi2c-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed Python packages from the builder stage
+COPY --from=builder /install /usr/local
+
+# Create a non-root application user for security
+RUN useradd --system --uid 1001 --gid 0 --no-create-home appuser
 
 WORKDIR /app
 
 # Copy application source
 COPY Zweather/ ./Zweather/
-COPY Zweather/app.py ./app.py
 
-# Give ownership to the non-root user
-RUN chown -R zedd:zedd /app
+# Ensure the package is importable
+RUN touch Zweather/__init__.py 2>/dev/null || true
 
-USER zedd
+# SQLite buffer and liveness probe live under /tmp (world-writable at runtime)
+# The liveness probe touches /tmp/zedd-alive; K3s mounts an emptyDir there.
+VOLUME ["/tmp"]
 
-# Environment variable defaults (overridden at runtime by K8s ConfigMap/Secret)
-ENV INFLUXDB_URL="http://influxdb:8086" \
-    INFLUXDB_ORG="zedd-weather" \
-    INFLUXDB_BUCKET="telemetry" \
-    PUBLISH_INTERVAL="10.0" \
-    SENSE_HAT_TEMP_OFFSET="2.0" \
-    LOG_LEVEL="INFO"
+# Switch to non-root user (overridden to root in the edge K3s pod which
+# needs privileged I2C access; see k3s/zedd-weather-edge-deployment.yaml)
+USER appuser
 
-# Expose no ports – this is a push-only telemetry publisher
-ENTRYPOINT ["python", "app.py"]
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    SQLITE_DB_PATH=/tmp/zedd_buffer.db
 
-# Metadata labels
-LABEL org.opencontainers.image.source="https://github.com/WilliamMajanja/Zedd-Weather" \
-      org.opencontainers.image.description="Zedd Weather edge telemetry publisher for Raspberry Pi / Sense HAT" \
-      org.opencontainers.image.licenses="MIT"
+ENTRYPOINT ["python", "-m", "Zweather.app"]

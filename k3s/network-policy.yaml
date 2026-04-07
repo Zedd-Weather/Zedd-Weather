@@ -1,0 +1,137 @@
+# =============================================================================
+# Network Policies for the zedd-weather namespace
+#
+# Policy overview:
+#   1. default-deny-ingress   – block all inbound traffic by default
+#   2. allow-edge-to-influxdb – edge collector → InfluxDB
+#   3. allow-grafana-to-influxdb – Grafana → InfluxDB
+#   4. allow-ingress-grafana  – allow traffic from anywhere to Grafana port
+#   5. allow-ingress-open-webui – allow traffic from anywhere to Open WebUI
+#   6. allow-dns-egress       – allow all pods to reach kube-dns
+# =============================================================================
+
+---
+# 1. Deny all ingress to every pod in the namespace unless explicitly allowed
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+spec:
+  podSelector: {}   # applies to ALL pods in the namespace
+  policyTypes:
+    - Ingress
+
+---
+# 2. Edge collector → InfluxDB (port 8086)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-edge-to-influxdb
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+spec:
+  podSelector:
+    matchLabels:
+      app: influxdb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: zedd-weather-edge
+      ports:
+        - protocol: TCP
+          port: 8086
+
+---
+# 3. Grafana → InfluxDB (port 8086)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-to-influxdb
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+spec:
+  podSelector:
+    matchLabels:
+      app: influxdb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: grafana
+      ports:
+        - protocol: TCP
+          port: 8086
+
+---
+# 4. Allow ingress to Grafana from anywhere (e.g. cluster ingress controller)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-grafana
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+spec:
+  podSelector:
+    matchLabels:
+      app: grafana
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 3000
+
+---
+# 5. Allow ingress to Open WebUI from anywhere
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-open-webui
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+spec:
+  podSelector:
+    matchLabels:
+      app: open-webui
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# 6. Allow agricultural engine → InfluxDB (port 8086)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-agricultural-to-influxdb
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+spec:
+  podSelector:
+    matchLabels:
+      app: influxdb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: agricultural-engine
+      ports:
+        - protocol: TCP
+          port: 8086

@@ -1,0 +1,49 @@
+# =============================================================================
+# Prometheus ServiceMonitor – Zedd-Weather namespace
+#
+# Requires the Prometheus Operator (kube-prometheus-stack or standalone).
+# The ServiceMonitor tells Prometheus which Services to scrape and how.
+#
+# Services scraped:
+#   - influxdb  (port 8086, path /metrics)
+#   - grafana   (port 3000, path /metrics)
+# =============================================================================
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: zedd-weather-metrics
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+    # This label is typically required by the Prometheus Operator to discover
+    # ServiceMonitors; adjust to match your Prometheus release label selector.
+    release: prometheus
+spec:
+  # Only discover services in the zedd-weather namespace
+  namespaceSelector:
+    matchNames:
+      - zedd-weather
+
+  # Scrape any service that has this label
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: zedd-weather
+
+  endpoints:
+    # InfluxDB Prometheus-compatible metrics endpoint
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      # InfluxDB 2.x /metrics requires a valid token
+      bearerTokenSecret:
+        name: influxdb-credentials
+        key: INFLUXDB_TOKEN
+
+    # Grafana internal metrics (available without authentication by default)
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

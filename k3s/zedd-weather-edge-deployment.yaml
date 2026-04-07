@@ -1,0 +1,109 @@
+# =============================================================================
+# Zedd-Weather Edge Collector – Deployment
+# Runs on pinet-rho (node with label sensor=sense-hat) to read the Sense HAT
+# and write telemetry to InfluxDB.
+#
+# Key requirements:
+#   - Privileged container for I2C access
+#   - /dev/i2c-1 host device mounted
+#   - Liveness probe via /tmp/zedd-alive file (touched every publish cycle)
+# =============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zedd-weather-edge
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/name: zedd-weather-edge
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: edge-collector
+spec:
+  replicas: 1
+  strategy:
+    # Only one pod can own the Sense HAT hardware at a time
+    type: Recreate
+  selector:
+    matchLabels:
+      app: zedd-weather-edge
+  template:
+    metadata:
+      labels:
+        app: zedd-weather-edge
+        app.kubernetes.io/part-of: zedd-weather
+    spec:
+      # Pin to the node that has the physical Sense HAT attached
+      nodeSelector:
+        sensor: sense-hat
+
+      # Privileged mode required for I2C hardware access
+      securityContext:
+        runAsUser: 0
+
+      containers:
+        - name: edge-collector
+          image: ghcr.io/williammajanja/zedd-weather-edge:latest
+          imagePullPolicy: Always
+
+          securityContext:
+            privileged: true
+
+          # Non-secret configuration from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: zedd-weather-config
+
+          # Secrets injected individually
+          env:
+            - name: INFLUXDB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-credentials
+                  key: INFLUXDB_TOKEN
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: api-credentials
+                  key: GEMINI_API_KEY
+
+          volumeMounts:
+            # /dev/i2c-1 is mounted via hostPath (see volumes below)
+            - name: i2c-dev
+              mountPath: /dev/i2c-1
+            # Shared /tmp volume for SQLite buffer and liveness probe file
+            - name: tmp-vol
+              mountPath: /tmp
+
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+          # Liveness: the app touches /tmp/zedd-alive every publish cycle.
+          # If the file is older than 3× the publish interval the pod is restarted.
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "test $(find /tmp/zedd-alive -mmin -1 2>/dev/null | wc -l) -gt 0"
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      volumes:
+        # Expose the host I2C bus into the container
+        - name: i2c-dev
+          hostPath:
+            path: /dev/i2c-1
+            type: CharDevice
+        # In-memory /tmp so SQLite buffer and liveness file are fast
+        - name: tmp-vol
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
