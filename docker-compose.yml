@@ -43,7 +43,7 @@ services:
   # Grafana – dashboards and alerting
   # ---------------------------------------------------------------------------
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.1.0
     container_name: zedd-grafana
     restart: unless-stopped
     ports:

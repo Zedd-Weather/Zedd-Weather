@@ -374,7 +374,60 @@ def touch_liveness() -> None:
 # Main loop
 # ---------------------------------------------------------------------------
 
-def run() -> None:  # noqa: C901 – complexity is intentional for a main loop
+def _write_with_retry(
+    reading: TelemetryReading,
+    write_api: "WriteApi",  # type: ignore[name-defined]
+    db_conn: sqlite3.Connection,
+    node_name: str,
+    consecutive_failures: int,
+    max_failures: int,
+) -> tuple[int, "WriteApi"]:  # type: ignore[name-defined]
+    """
+    Attempt to write a single reading to InfluxDB.
+    On failure: buffer locally and potentially reconnect.
+    Returns (updated_failure_count, write_api).
+    """
+    try:
+        try:
+            flush_buffer(db_conn, write_api, node_name)
+        except Exception as flush_exc:
+            log.debug("Buffer flush failed: %s", flush_exc)
+
+        write_api.write(
+            bucket=INFLUXDB_BUCKET,
+            org=INFLUXDB_ORG,
+            record=reading.to_influx_point(node_name),
+        )
+        log.info(
+            "Written: temp=%.2f°C  humidity=%.2f%%  pressure=%.2f hPa%s",
+            reading.temperature_c,
+            reading.humidity_pct,
+            reading.pressure_hpa,
+            "  [ANOMALY]" if reading.anomaly else "",
+        )
+        return 0, write_api
+
+    except Exception as write_exc:
+        consecutive_failures += 1
+        log.warning(
+            "InfluxDB write failed (%d/%d): %s",
+            consecutive_failures, max_failures, write_exc,
+        )
+        buffer_reading(db_conn, reading)
+
+        if consecutive_failures >= max_failures:
+            log.error("Too many consecutive failures – attempting to reconnect")
+            try:
+                _, write_api = _build_write_api()
+                consecutive_failures = 0
+                log.info("Reconnected to InfluxDB")
+            except Exception as reconnect_exc:
+                log.error("Reconnect failed: %s", reconnect_exc)
+
+        return consecutive_failures, write_api
+
+
+def run() -> None:
     log.info(
         "Zedd-Weather edge collector starting (node=%s, interval=%.1fs)",
         NODE_NAME, PUBLISH_INTERVAL,
@@ -409,7 +462,6 @@ def run() -> None:  # noqa: C901 – complexity is intentional for a main loop
     # --- Anomaly detector ---
     detector = AnomalyDetector()
 
-    # --- Main loop ---
     consecutive_failures = 0
     MAX_FAILURES         = 5
 
@@ -417,66 +469,22 @@ def run() -> None:  # noqa: C901 – complexity is intentional for a main loop
         cycle_start = time.monotonic()
 
         try:
-            # 1. Read sensor
             reading = reader.read()
             log.debug(
                 "Read: temp=%.2f°C  humidity=%.2f%%  pressure=%.2f hPa",
                 reading.temperature_c, reading.humidity_pct, reading.pressure_hpa,
             )
 
-            # 2. Validate
             reading = detector.validate(reading)
 
-            # 3. Write to InfluxDB (or buffer if unavailable)
             if write_api is not None:
-                try:
-                    # First try to flush any buffered readings
-                    try:
-                        flush_buffer(db_conn, write_api, NODE_NAME)
-                    except Exception as flush_exc:
-                        log.debug("Buffer flush failed: %s", flush_exc)
-
-                    # Write the current point
-                    write_api.write(
-                        bucket=INFLUXDB_BUCKET,
-                        org=INFLUXDB_ORG,
-                        record=reading.to_influx_point(NODE_NAME),
-                    )
-                    log.info(
-                        "Written: temp=%.2f°C  humidity=%.2f%%  pressure=%.2f hPa%s",
-                        reading.temperature_c,
-                        reading.humidity_pct,
-                        reading.pressure_hpa,
-                        "  [ANOMALY]" if reading.anomaly else "",
-                    )
-                    consecutive_failures = 0
-
-                except Exception as write_exc:
-                    consecutive_failures += 1
-                    log.warning(
-                        "InfluxDB write failed (%d/%d): %s",
-                        consecutive_failures, MAX_FAILURES, write_exc,
-                    )
-                    buffer_reading(db_conn, reading)
-
-                    # Attempt to reconnect after too many failures
-                    if consecutive_failures >= MAX_FAILURES:
-                        log.error(
-                            "Too many consecutive failures – attempting to reconnect"
-                        )
-                        try:
-                            if influx_client:
-                                influx_client.close()
-                            influx_client, write_api = _build_write_api()
-                            consecutive_failures = 0
-                            log.info("Reconnected to InfluxDB")
-                        except Exception as reconnect_exc:
-                            log.error("Reconnect failed: %s", reconnect_exc)
+                consecutive_failures, write_api = _write_with_retry(
+                    reading, write_api, db_conn, NODE_NAME,
+                    consecutive_failures, MAX_FAILURES,
+                )
             else:
-                # No InfluxDB available – just buffer
                 buffer_reading(db_conn, reading)
 
-            # 4. Touch liveness file
             touch_liveness()
 
         except KeyboardInterrupt:
@@ -485,10 +493,8 @@ def run() -> None:  # noqa: C901 – complexity is intentional for a main loop
         except Exception as exc:
             log.exception("Unexpected error in main loop: %s", exc)
 
-        # Sleep for the remainder of the publish interval
-        elapsed = time.monotonic() - cycle_start
-        sleep_for = max(0.0, PUBLISH_INTERVAL - elapsed)
-        time.sleep(sleep_for)
+        elapsed  = time.monotonic() - cycle_start
+        time.sleep(max(0.0, PUBLISH_INTERVAL - elapsed))
 
     # Graceful shutdown
     log.info("Closing resources…")

@@ -49,7 +49,11 @@ spec:
       scrapeTimeout: 10s
 
 ---
-# PodMonitor for the edge collector (no Service fronts the edge pod)
+# PodMonitor for the edge collector.
+# NOTE: The edge pod does not currently expose a /metrics endpoint. This
+# PodMonitor is a placeholder for when Prometheus instrumentation is added to
+# Zweather/app.py (e.g. via prometheus-client). The port name "metrics" must
+# match a containerPort added to zedd-weather-edge-deployment.yaml at that time.
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
@@ -68,6 +72,8 @@ spec:
       app: zedd-weather-edge
 
   podMetricsEndpoints:
+    # Update port name and containerPort in the edge Deployment when metrics
+    # instrumentation is added to Zweather/app.py.
     - port: metrics
       path: /metrics
       interval: 30s
