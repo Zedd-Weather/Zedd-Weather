@@ -11,12 +11,18 @@ on:
     branches:
       - main
 
+# Restrict default token permissions; each job opts in to what it needs.
+permissions:
+  contents: read
+
 jobs:
   # ---------------------------------------------------------------------------
   # Python linting
   # ---------------------------------------------------------------------------
   lint-python:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -47,6 +53,8 @@ jobs:
   test-python:
     runs-on: ubuntu-latest
     needs: lint-python
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -76,6 +84,8 @@ jobs:
   # ---------------------------------------------------------------------------
   lint-typescript:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -96,6 +106,9 @@ jobs:
   build-docker:
     runs-on: ubuntu-latest
     needs: [lint-python, lint-typescript]
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -133,6 +146,8 @@ jobs:
   # ---------------------------------------------------------------------------
   validate-k3s-manifests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -171,6 +186,9 @@ jobs:
     needs: build-docker
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: production
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
 
