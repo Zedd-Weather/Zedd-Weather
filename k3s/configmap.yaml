@@ -93,6 +93,38 @@ data:
   GDD_BASE_TEMP_C:                    "10.0"
 
 ---
+# Construction Intelligence Engine thresholds
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: construction-config
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+    app.kubernetes.io/component: construction-engine
+data:
+  # Temperature extremes (worker safety)
+  HEAT_HALT_THRESHOLD_C:              "43.0"
+  COLD_HALT_THRESHOLD_C:              "-10.0"
+  # Wind thresholds (m/s)
+  WIND_CAUTION_THRESHOLD_MS:          "10.0"
+  WIND_HALT_THRESHOLD_MS:             "18.0"
+  CRANE_WIND_HALT_MS:                 "13.0"
+  # Concrete-specific
+  CONCRETE_TEMP_MIN_C:                "5.0"
+  CONCRETE_TEMP_MAX_C:                "35.0"
+  CONCRETE_RAIN_SENSITIVE:            "true"
+  # UV / worker exposure
+  UV_CAUTION_THRESHOLD:               "6.0"
+  UV_HALT_THRESHOLD:                  "11.0"
+  # Storm detection
+  STORM_PRESSURE_THRESHOLD_HPA:       "995.0"
+  # Work/rest cycle defaults
+  DEFAULT_WORK_REST_RATIO:            "50:10"
+  # Safety check intervals (hours)
+  SAFETY_CHECK_INTERVAL_HOURS:        "4"
+
+---
 # Alert channel / notification configuration
 apiVersion: v1
 kind: ConfigMap

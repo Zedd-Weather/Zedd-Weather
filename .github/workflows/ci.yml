@@ -47,7 +47,7 @@ jobs:
 
       - name: Mypy
         run: |
-          mypy Zweather/app.py Zweather/agricultural/engine.py Zweather/alerting/rules.py \
+          mypy Zweather/app.py Zweather/agricultural/engine.py Zweather/construction/engine.py Zweather/alerting/rules.py \
             --ignore-missing-imports
 
   # ---------------------------------------------------------------------------
@@ -181,6 +181,9 @@ jobs:
       - name: Validate agricultural-engine-deployment manifest
         run: kubectl apply --dry-run=client -f k3s/agricultural-engine-deployment.yaml
 
+      - name: Validate construction-engine-deployment manifest
+        run: kubectl apply --dry-run=client -f k3s/construction-engine-deployment.yaml
+
   # ---------------------------------------------------------------------------
   # Deploy (main branch only)
   # ---------------------------------------------------------------------------
@@ -227,6 +230,9 @@ jobs:
 
       - name: Apply agricultural engine deployment
         run: kubectl apply -f k3s/agricultural-engine-deployment.yaml
+
+      - name: Apply construction engine deployment
+        run: kubectl apply -f k3s/construction-engine-deployment.yaml
 
       - name: Wait for rollout
         run: |

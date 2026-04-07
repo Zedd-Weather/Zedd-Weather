@@ -113,7 +113,31 @@ spec:
           port: 8080
 
 ---
-# 6. Allow agricultural engine → InfluxDB (port 8086)
+# 6. Allow construction engine → InfluxDB (port 8086)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-construction-to-influxdb
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+spec:
+  podSelector:
+    matchLabels:
+      app: influxdb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: construction-engine
+      ports:
+        - protocol: TCP
+          port: 8086
+
+---
+# 7. Allow agricultural engine → InfluxDB (port 8086)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
