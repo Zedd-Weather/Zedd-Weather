@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   mqtt-broker:
     image: eclipse-mosquitto:2
