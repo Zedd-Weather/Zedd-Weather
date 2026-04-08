@@ -119,7 +119,7 @@ class TelemetryReading:
             .field("humidity_pct",   self.humidity_pct)
             .field("pressure_hpa",   self.pressure_hpa)
             .field("anomaly",        int(self.anomaly))
-            .time(self.timestamp, WritePrecision.SECONDS)
+            .time(self.timestamp, WritePrecision.S)
         )
 
 # ---------------------------------------------------------------------------
