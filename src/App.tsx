@@ -755,8 +755,9 @@ export default function App() {
   }, [historicalRange, activeTab, piLocation, telemetrySource]);
 
   const [nodes] = useState([
-    { id: 'Node Alpha', role: 'Primary - Sense HAT', status: 'Active', ip: '10.0.0.15', detail: 'Capturing telemetry' },
-    { id: 'Node Beta', role: 'Vault - Minima Node', status: 'Active', ip: '10.0.0.16', detail: 'Sharding & Attestation' },
+    { id: 'Node A', role: 'Control Plane + Storage', status: 'Active', ip: '10.0.0.14', detail: 'InfluxDB, Grafana, Open WebUI' },
+    { id: 'Node B', role: 'AI Worker', status: 'Active', ip: '10.0.0.15', detail: 'Orchestration + AI Inference' },
+    { id: 'Node C', role: 'Sensory Worker', status: 'Active', ip: '10.0.0.16', detail: 'Telemetry Publisher (MQTT)' },
   ]);
 
   const [attestations, setAttestations] = useState([

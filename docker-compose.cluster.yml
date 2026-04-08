@@ -16,14 +16,14 @@ services:
     container_name: zedd-sensory-worker
     restart: unless-stopped
     environment:
-      MQTT_BROKER_HOST: mqtt-broker
-      MQTT_BROKER_PORT: 1883
-      MQTT_TOPIC: weather_station/telemetry
-      SENSE_HAT_ENABLED: "false"
-      RAIN_GAUGE_ENABLED: "false"
-      UV_SENSOR_ENABLED: "false"
-      ENVIRO_PLUS_ENABLED: "false"
-      MODBUS_ENABLED: "false"
+      MQTT_BROKER_HOST: ${MQTT_BROKER_HOST:-mqtt-broker}
+      MQTT_BROKER_PORT: ${MQTT_BROKER_PORT:-1883}
+      MQTT_TOPIC: ${MQTT_TOPIC:-weather_station/telemetry}
+      SENSE_HAT_ENABLED: "${SENSE_HAT_ENABLED:-false}"
+      RAIN_GAUGE_ENABLED: "${RAIN_GAUGE_ENABLED:-false}"
+      UV_SENSOR_ENABLED: "${UV_SENSOR_ENABLED:-false}"
+      ENVIRO_PLUS_ENABLED: "${ENVIRO_PLUS_ENABLED:-false}"
+      MODBUS_ENABLED: "${MODBUS_ENABLED:-false}"
       PUBLISH_INTERVAL: ${PUBLISH_INTERVAL:-10.0}
     command: ["python", "-m", "Zweather.node1_telemetry.mqtt_publisher"]
     depends_on:
@@ -36,8 +36,8 @@ services:
     container_name: zedd-ai-worker
     restart: unless-stopped
     environment:
-      MQTT_BROKER_HOST: mqtt-broker
-      MQTT_BROKER_PORT: 1883
+      MQTT_BROKER_HOST: ${MQTT_BROKER_HOST:-mqtt-broker}
+      MQTT_BROKER_PORT: ${MQTT_BROKER_PORT:-1883}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     command: ["python", "-m", "Zweather.node2_orchestration.zedd_orchestrator"]
     depends_on:
