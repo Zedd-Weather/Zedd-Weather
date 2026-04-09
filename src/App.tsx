@@ -52,12 +52,7 @@ import { Toaster, toast } from 'sonner';
 type TabId = 'telemetry' | 'risk' | 'map' | 'forecast' | 'locker';
 interface GeoLocation { lat: number; lng: number; }
 
-const mockWeatherData = Array.from({ length: 24 }, (_, i) => ({
-  time: `${i}:00`,
-  temp: 20 + Math.sin(i / 4) * 10 + Math.random() * 2,
-  humidity: 50 + Math.cos(i / 4) * 20 + Math.random() * 5,
-  pressure: 1010 + Math.sin(i / 8) * 5 + Math.random(),
-}));
+// Hourly data populated from Open-Meteo in fetchRealTelemetry()
 
 // Initialize Gemini API with validation
 const apiKey = process.env.GEMINI_API_KEY;
@@ -187,6 +182,9 @@ export default function App() {
   });
 
   const currentTelemetry = telemetrySource === 'onboard' ? onboardTelemetry : externalTelemetry;
+
+  // 24-hour weather data (fetched from Open-Meteo for both modes)
+  const [hourlyWeatherData, setHourlyWeatherData] = useState<{time: string, temp: number, humidity: number, pressure: number}[]>([]);
 
   // Risk Analysis State
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -352,39 +350,21 @@ export default function App() {
     if (!piLocation) return;
     setIsFetchingForecast(true);
     try {
-      if (telemetrySource === 'external') {
-        const res = await fetch(`${API_BASE.weather}?latitude=${piLocation.lat}&longitude=${piLocation.lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,uv_index_max&timezone=auto`);
-        const data = await res.json();
-        if (data && data.daily) {
-          const formatted = data.daily.time.map((timeStr: string, i: number) => ({
-            date: new Date(timeStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-            tempMax: data.daily.temperature_2m_max[i],
-            tempMin: data.daily.temperature_2m_min[i],
-            precip: data.daily.precipitation_probability_max[i],
-            wind: data.daily.wind_speed_10m_max[i],
-            uv: data.daily.uv_index_max[i]
-          }));
-          setForecastData(formatted);
-        }
-      } else {
-        // Generate mock forecast for onboard
-        const mockForecast = [];
-        const now = new Date();
-        for (let i = 0; i < 7; i++) {
-          const d = new Date(now.getTime() + i * 24 * 60 * 60 * 1000);
-          mockForecast.push({
-            date: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-            tempMax: 20 + Math.random() * 10,
-            tempMin: 10 + Math.random() * 10,
-            precip: Math.floor(Math.random() * 100),
-            wind: 5 + Math.random() * 20,
-            uv: Math.random() * 10
-          });
-        }
-        setForecastData(mockForecast);
+      const res = await fetch(`${API_BASE.weather}?latitude=${piLocation.lat}&longitude=${piLocation.lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,uv_index_max&timezone=auto`);
+      const data = await res.json();
+      if (data && data.daily) {
+        const formatted = data.daily.time.map((timeStr: string, i: number) => ({
+          date: new Date(timeStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+          tempMax: data.daily.temperature_2m_max[i],
+          tempMin: data.daily.temperature_2m_min[i],
+          precip: data.daily.precipitation_probability_max[i],
+          wind: data.daily.wind_speed_10m_max[i],
+          uv: data.daily.uv_index_max[i]
+        }));
+        setForecastData(formatted);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Failed to fetch forecast:", err);
     } finally {
       setIsFetchingForecast(false);
     }
@@ -394,7 +374,7 @@ export default function App() {
     if (activeTab === 'forecast') {
       fetchForecast();
     }
-  }, [activeTab, piLocation, telemetrySource]);
+  }, [activeTab, piLocation]);
 
   const analyzeForecast = async () => {
     setIsAnalyzing(true);
@@ -449,7 +429,7 @@ export default function App() {
       const { lat, lng: lon } = location;
       
       const [weatherRes, aqiRes, marineRes] = await Promise.all([
-        fetch(`${API_BASE.weather}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,uv_index&hourly=precipitation_probability&timezone=auto`),
+        fetch(`${API_BASE.weather}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,uv_index&hourly=temperature_2m,relative_humidity_2m,surface_pressure,precipitation_probability&timezone=auto&forecast_days=1`),
         fetch(`${API_BASE.airQuality}?latitude=${lat}&longitude=${lon}&current=us_aqi`),
         fetch(`${API_BASE.marine}?latitude=${lat}&longitude=${lon}&current=wave_height`)
       ]);
@@ -473,6 +453,21 @@ export default function App() {
       };
 
       setExternalTelemetry(newTelemetry);
+
+      // Also update onboard telemetry with real data (onboard = same API, local reference)
+      setOnboardTelemetry(newTelemetry);
+
+      // Populate 24-hour weather chart from hourly API data
+      if (weather.hourly?.time) {
+        const hourly = weather.hourly.time.map((t: string, i: number) => ({
+          time: new Date(t).toLocaleTimeString('en-US', { hour: '2-digit', hour12: false }),
+          temp: weather.hourly.temperature_2m?.[i] ?? 0,
+          humidity: weather.hourly.relative_humidity_2m?.[i] ?? 0,
+          pressure: weather.hourly.surface_pressure?.[i] ?? 0,
+        }));
+        setHourlyWeatherData(hourly);
+      }
+
       return newTelemetry;
     } catch (error) {
       console.error("Failed to fetch real telemetry:", error);
@@ -541,7 +536,6 @@ export default function App() {
   useEffect(() => {
     let isMounted = true;
     let interval: any;
-    let simInterval: any;
     
     const init = async () => {
       let location = DEFAULT_LOCATION;
@@ -567,18 +561,6 @@ export default function App() {
         interval = setInterval(() => {
           fetchRealTelemetry(location);
         }, TELEMETRY_REFRESH_INTERVAL_MS); // Update every minute
-
-        simInterval = setInterval(() => {
-          setOnboardTelemetry(prev => ({
-            ...prev,
-            temp: prev.temp + (Math.random() * 0.4 - 0.2),
-            humidity: Math.max(0, Math.min(100, prev.humidity + (Math.random() * 1 - 0.5))),
-            pressure: prev.pressure + (Math.random() * 0.2 - 0.1),
-            aqi: Math.max(0, prev.aqi + (Math.random() * 2 - 1)),
-            precipitation: Math.max(0, Math.min(100, prev.precipitation + (Math.random() * 10 - 5))),
-            uvIndex: Math.max(0, prev.uvIndex + (Math.random() * 0.2 - 0.1))
-          }));
-        }, 2000); // Update simulated hardware every 2 seconds
       }
     };
     
@@ -587,7 +569,6 @@ export default function App() {
     return () => {
       isMounted = false;
       if (interval) clearInterval(interval);
-      if (simInterval) clearInterval(simInterval);
     };
   }, []);
 
@@ -680,65 +661,33 @@ export default function App() {
     setIsExportModalOpen(false);
   };
 
-  // Fetch Historical Telemetry
-  const fetchHistoricalTelemetry = async (days: number, location: {lat: number, lng: number}, source: 'onboard' | 'external') => {
+  // Fetch Historical Telemetry — always from Open-Meteo
+  const fetchHistoricalTelemetry = async (days: number, location: {lat: number, lng: number}) => {
     setIsFetchingHistory(true);
     try {
-      if (source === 'external') {
-        const { lat, lng: lon } = location;
+      const { lat, lng: lon } = location;
+      
+      const res = await fetch(`${API_BASE.weather}?latitude=${lat}&longitude=${lon}&past_days=${days}&hourly=temperature_2m,relative_humidity_2m,surface_pressure,precipitation_probability`);
+      const data = await res.json();
+      
+      if (data && data.hourly) {
+        const formattedData = data.hourly.time.map((timeStr: string, index: number) => {
+          const date = new Date(timeStr);
+          return {
+            time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' }),
+            rawDate: date,
+            temp: data.hourly.temperature_2m[index],
+            humidity: data.hourly.relative_humidity_2m[index],
+            pressure: data.hourly.surface_pressure[index],
+            precipitation: data.hourly.precipitation_probability[index],
+          };
+        });
         
-        const res = await fetch(`${API_BASE.weather}?latitude=${lat}&longitude=${lon}&past_days=${days}&hourly=temperature_2m,relative_humidity_2m,surface_pressure,precipitation_probability`);
-        const data = await res.json();
-        
-        if (data && data.hourly) {
-          const formattedData = data.hourly.time.map((timeStr: string, index: number) => {
-            const date = new Date(timeStr);
-            return {
-              time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' }),
-              rawDate: date,
-              temp: data.hourly.temperature_2m[index],
-              humidity: data.hourly.relative_humidity_2m[index],
-              pressure: data.hourly.surface_pressure[index],
-              precipitation: data.hourly.precipitation_probability[index],
-            };
-          });
-          
-          // Filter to show roughly 1 point per day for longer ranges to avoid chart clutter, or every 6 hours for 7 days
-          const step = days === 7 ? 6 : (days === 14 ? 12 : 24);
-          const sampledData = formattedData.filter((_: any, i: number) => i % step === 0);
-          
-          setHistoricalData(sampledData);
-        }
-      } else {
-        // Generate mock historical data for onboard
-        const mockData = [];
-        const now = new Date();
+        // Filter to show roughly 1 point per day for longer ranges to avoid chart clutter, or every 6 hours for 7 days
         const step = days === 7 ? 6 : (days === 14 ? 12 : 24);
-        const totalPoints = (days * 24) / step;
+        const sampledData = formattedData.filter((_: any, i: number) => i % step === 0);
         
-        let lastTemp = 22;
-        let lastHum = 45;
-        let lastPres = 1012;
-        let lastPrecip = 10;
-
-        for (let i = totalPoints; i >= 0; i--) {
-          const d = new Date(now.getTime() - i * step * 60 * 60 * 1000);
-          
-          lastTemp += (Math.random() * 4 - 2);
-          lastHum = Math.max(20, Math.min(80, lastHum + (Math.random() * 10 - 5)));
-          lastPres += (Math.random() * 4 - 2);
-          lastPrecip = Math.max(0, Math.min(100, lastPrecip + (Math.random() * 20 - 10)));
-
-          mockData.push({
-            time: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' }),
-            rawDate: d,
-            temp: lastTemp,
-            humidity: lastHum,
-            pressure: lastPres,
-            precipitation: lastPrecip
-          });
-        }
-        setHistoricalData(mockData);
+        setHistoricalData(sampledData);
       }
     } catch (error) {
       console.error("Failed to fetch historical telemetry:", error);
@@ -750,9 +699,9 @@ export default function App() {
   useEffect(() => {
     if (activeTab === 'telemetry' && piLocation) {
       const days = historicalRange === '7d' ? 7 : (historicalRange === '14d' ? 14 : 30);
-      fetchHistoricalTelemetry(days, piLocation, telemetrySource);
+      fetchHistoricalTelemetry(days, piLocation);
     }
-  }, [historicalRange, activeTab, piLocation, telemetrySource]);
+  }, [historicalRange, activeTab, piLocation]);
 
   const [nodes] = useState([
     { id: 'Node A', role: 'Control Plane + Storage', status: 'Active', ip: '10.0.0.14', detail: 'InfluxDB, Grafana, Open WebUI' },
@@ -760,12 +709,7 @@ export default function App() {
     { id: 'Node C', role: 'Sensory Worker', status: 'Active', ip: '10.0.0.16', detail: 'Telemetry Publisher (MQTT)' },
   ]);
 
-  const [attestations, setAttestations] = useState([
-    { id: '0x8f7a...3b21', time: 'Just now', type: 'Atmospheric Shard', verified: true },
-    { id: '0x2c4d...9a12', time: '10 mins ago', type: 'Atmospheric Shard', verified: true },
-    { id: '0x5e1b...4f88', time: '20 mins ago', type: 'Inertial Shard', verified: true },
-    { id: '0x9d3c...7e45', time: '30 mins ago', type: 'Atmospheric Shard', verified: true },
-  ]);
+  const [attestations, setAttestations] = useState<{id: string, time: string, type: string, verified: boolean}[]>([]);
 
   const [isGeneratingProof, setIsGeneratingProof] = useState(false);
   const [isLedgerOpen, setIsLedgerOpen] = useState(false);
@@ -777,29 +721,22 @@ export default function App() {
     if (!riskReport) return;
     setIsSharding(true);
     
-    // Simulate cryptographic sharding delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
     // Split the report into paragraphs/sections to represent shards
     const chunks = riskReport.split('\n\n').filter(chunk => chunk.trim().length > 0);
     
-    const newShards = chunks.map((chunk, index) => {
-      // Simple mock hash generation for the shard
-      const dataString = chunk + Date.now() + index;
-      let hash = 0;
-      for (let i = 0; i < dataString.length; i++) {
-        const char = dataString.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-      }
-      const hexHash = '0x' + Math.abs(hash).toString(16).padStart(8, '0') + Math.floor(Math.random() * 10000).toString(16).padStart(4, '0');
+    const newShards = await Promise.all(chunks.map(async (chunk, index) => {
+      // SHA-256 hash via Web Crypto API
+      const data = new TextEncoder().encode(chunk + Date.now() + index);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hexHash = '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
       
       return {
         id: `Shard-${index + 1}`,
         hash: hexHash,
         content: chunk
       };
-    });
+    }));
     
     setDirectiveShards(newShards);
     saveToLocker(newShards, riskReport, riskLevel);
@@ -808,21 +745,16 @@ export default function App() {
 
   const generateZeddProof = async () => {
     setIsGeneratingProof(true);
-    // Simulate cryptographic hashing delay
-    await new Promise(resolve => setTimeout(resolve, 800));
     
-    // Simple mock hash generation based on current telemetry
+    // SHA-256 hash via Web Crypto API
     const dataString = JSON.stringify(currentTelemetry) + Date.now();
-    let hash = 0;
-    for (let i = 0; i < dataString.length; i++) {
-      const char = dataString.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    const hexHash = '0x' + Math.abs(hash).toString(16).padStart(8, '0') + '...' + Math.floor(Math.random() * 10000).toString(16).padStart(4, '0');
+    const data = new TextEncoder().encode(dataString);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hexHash = '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     
     setAttestations(prev => [
-      { id: hexHash, time: 'Just now', type: 'Manual Shard', verified: true },
+      { id: hexHash, time: 'Just now', type: 'Telemetry Shard', verified: true },
       ...prev.slice(0, 3) // Keep only the latest 4
     ]);
     setIsGeneratingProof(false);
@@ -1208,7 +1140,7 @@ export default function App() {
                   </div>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={mockWeatherData}>
+                      <AreaChart data={hourlyWeatherData}>
                         <defs>
                           <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
@@ -1237,7 +1169,7 @@ export default function App() {
                   </div>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={mockWeatherData}>
+                      <LineChart data={hourlyWeatherData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
                         <XAxis dataKey="time" stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
                         <YAxis yAxisId="left" stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
@@ -1858,20 +1790,19 @@ export default function App() {
               </button>
             </div>
             <div className="p-3 sm:p-6 overflow-y-auto flex-1 space-y-2 sm:space-y-3">
-              {/* Generate a larger list for the full ledger view based on existing attestations */}
-              {[...attestations, ...Array.from({ length: 15 }).map((_, i) => ({
-                id: `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`,
-                time: `${i + 1} hours ago`,
-                type: i % 3 === 0 ? 'Inertial Shard' : 'Atmospheric Shard',
-                verified: true
-              }))].map((att, i) => (
+              {attestations.length === 0 ? (
+                <div className="py-8 text-center">
+                  <ShieldCheck className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500">No attestations yet. Generate a ZeddProof to populate the ledger.</p>
+                </div>
+              ) : attestations.map((att, i) => (
                 <div key={i} className="p-3 sm:p-4 rounded-lg bg-[#1a1a1a] border border-slate-800 flex items-center justify-between">
                   <div className="flex items-center space-x-3 sm:space-x-4">
                     <div className="p-2 sm:p-3 bg-slate-900 rounded-md border border-slate-800">
                       <Terminal className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm font-mono text-slate-300">{att.id}</p>
+                      <p className="text-xs sm:text-sm font-mono text-slate-300 break-all">{att.id.slice(0, 18)}...{att.id.slice(-8)}</p>
                       <p className="text-[10px] sm:text-xs text-slate-500 mt-1">{att.type} • {att.time}</p>
                     </div>
                   </div>

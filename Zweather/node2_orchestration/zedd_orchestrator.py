@@ -22,23 +22,66 @@ telemetry_queue = queue.Queue()
 
 def fetch_meteomatics_forecast(lat: float, lon: float) -> dict:
     """
-    Mockable function to fetch a 5-day macro-meteorological forecast.
-    In production, this integrates with the Meteomatics API.
+    Fetch a 5-day macro-meteorological forecast from the Meteomatics API.
+    Returns a summary dict; falls back to an empty result when credentials
+    are not configured or the API is unreachable.
     """
     user = os.getenv("METEOMATICS_USER")
     password = os.getenv("METEOMATICS_PASS")
     
     if not user or not password:
-        logger.warning("Meteomatics credentials missing. Using mock forecast data.")
-    
-    # Mocked 5-day forecast response
-    return {
-        "forecast_days": 5,
-        "avg_temp_c": 22.5,
-        "max_wind_speed_ms": 14.2,
-        "precip_probability_pct": 18.5,
-        "severe_weather_alerts": []
-    }
+        logger.warning("Meteomatics credentials missing (METEOMATICS_USER / METEOMATICS_PASS). Forecast unavailable.")
+        return {
+            "forecast_days": 0,
+            "avg_temp_c": None,
+            "max_wind_speed_ms": None,
+            "precip_probability_pct": None,
+            "severe_weather_alerts": [],
+            "source": "unavailable",
+        }
+
+    base_url = os.getenv("METEOMATICS_URL", "https://api.meteomatics.com")
+    from datetime import datetime as _dt, timezone as _tz
+    now = _dt.now(_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    url = f"{base_url}/{now}P5D:PT1H/t_2m:C,wind_speed_10m:ms/{lat},{lon}/json"
+
+    try:
+        import requests  # type: ignore
+        resp = requests.get(url, auth=(user, password), timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+
+        # Extract summary metrics from the Meteomatics response
+        temps = []
+        winds = []
+        for param in data.get("data", []):
+            for coord in param.get("coordinates", []):
+                for date_entry in coord.get("dates", []):
+                    val = date_entry.get("value")
+                    if val is not None:
+                        if "t_2m" in param.get("parameter", ""):
+                            temps.append(val)
+                        elif "wind_speed" in param.get("parameter", ""):
+                            winds.append(val)
+
+        return {
+            "forecast_days": 5,
+            "avg_temp_c": round(sum(temps) / len(temps), 1) if temps else None,
+            "max_wind_speed_ms": round(max(winds), 1) if winds else None,
+            "precip_probability_pct": None,  # not available in this Meteomatics query
+            "severe_weather_alerts": [],
+            "source": "meteomatics",
+        }
+    except Exception as e:
+        logger.error(f"Meteomatics API request failed: {e}")
+        return {
+            "forecast_days": 0,
+            "avg_temp_c": None,
+            "max_wind_speed_ms": None,
+            "precip_probability_pct": None,
+            "severe_weather_alerts": [],
+            "source": "error",
+        }
 
 def generate_mitigation_strategy(telemetry: dict, forecast: dict) -> str:
     """
@@ -89,8 +132,12 @@ def inference_worker():
             
             logger.info("Processing new telemetry payload...")
             
-            # 1. Fetch Macro-Forecast (using dummy coordinates for construction site)
-            forecast = fetch_meteomatics_forecast(lat=52.5200, lon=13.4050)
+            # 1. Fetch Macro-Forecast using configured site coordinates
+            site_lat = float(os.getenv("SITE_LATITUDE", "0"))
+            site_lon = float(os.getenv("SITE_LONGITUDE", "0"))
+            if site_lat == 0 and site_lon == 0:
+                logger.warning("Site coordinates not configured. Set SITE_LATITUDE and SITE_LONGITUDE env vars.")
+            forecast = fetch_meteomatics_forecast(lat=site_lat, lon=site_lon)
             
             # 2. Edge AI Inference
             strategy = generate_mitigation_strategy(telemetry=payload, forecast=forecast)

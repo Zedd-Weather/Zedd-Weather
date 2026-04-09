@@ -6,19 +6,24 @@ import asyncio
 import json
 import logging
 import hashlib
+import os
 from datetime import datetime, timezone
 import paho.mqtt.client as mqtt
 import aiohttp
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
-MQTT_BROKER = "127.0.0.1"
-MQTT_PORT = 1883
+MQTT_BROKER = os.environ.get("MQTT_BROKER_HOST", "127.0.0.1")
+MQTT_PORT = int(os.environ.get("MQTT_BROKER_PORT", "1883"))
 MQTT_TOPIC = "zedd/telemetry/node1"
 
-METEOMATICS_USER = "zedd_user"
-METEOMATICS_PASS = "zedd_pass"
-METEOMATICS_URL = "https://api.meteomatics.com"
+METEOMATICS_USER = os.environ.get("METEOMATICS_USER", "")
+METEOMATICS_PASS = os.environ.get("METEOMATICS_PASS", "")
+METEOMATICS_URL = os.environ.get("METEOMATICS_URL", "https://api.meteomatics.com")
+
+# Site coordinates – override with SITE_LATITUDE / SITE_LONGITUDE env vars
+SITE_LAT = float(os.environ.get("SITE_LATITUDE", "0"))
+SITE_LON = float(os.environ.get("SITE_LONGITUDE", "0"))
 
 class ZeddOrchestrator:
     def __init__(self):
@@ -41,18 +46,29 @@ class ZeddOrchestrator:
 
     async def fetch_macro_forecast(self):
         """Ingests 5-day macro-meteorological forecasts via Meteomatics API."""
+        if not METEOMATICS_USER or not METEOMATICS_PASS:
+            logging.warning("Meteomatics credentials not configured. Set METEOMATICS_USER and METEOMATICS_PASS.")
+            return None
+
+        if SITE_LAT == 0 and SITE_LON == 0:
+            logging.warning("Site coordinates not configured. Set SITE_LATITUDE and SITE_LONGITUDE.")
+            return None
+
         now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        # Example coordinates for construction site
-        url = f"{METEOMATICS_URL}/{now}P5D:PT1H/t_2m:C,wind_speed_10m:ms/40.7128,-74.0060/json"
+        url = f"{METEOMATICS_URL}/{now}P5D:PT1H/t_2m:C,wind_speed_10m:ms/{SITE_LAT},{SITE_LON}/json"
         
         try:
             async with self.session.get(url, auth=aiohttp.BasicAuth(METEOMATICS_USER, METEOMATICS_PASS)) as resp:
                 if resp.status == 200:
                     data = await resp.json()
+                    if not isinstance(data, dict) or "data" not in data:
+                        logging.warning("Meteomatics response missing expected 'data' field.")
+                        return None
                     logging.info("Successfully ingested Meteomatics macro forecast.")
                     return data
                 else:
-                    logging.warning(f"Meteomatics API returned status {resp.status}")
+                    body = await resp.text()
+                    logging.warning(f"Meteomatics API returned status {resp.status}: {body[:200]}")
                     return None
         except Exception as e:
             logging.error(f"Failed to fetch macro forecast: {e}")
