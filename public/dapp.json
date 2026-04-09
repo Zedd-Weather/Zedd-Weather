@@ -1,8 +1,8 @@
 {
   "id": "com.zedd.weather",
   "name": "Zedd Weather",
-  "description": "Enterprise-grade weather automation and environmental attestation system using Minima blockchain.",
-  "version": "1.0.0",
+  "description": "Raspberry Pi Weather Node edge DApp — Sense HAT environmental telemetry, Hailo-8L NPU on-device inference, and M.2 NVMe buffering on the PiNet cluster.",
+  "version": "1.1.0",
   "author": "WilliamMajanja",
   "kind": "typescript",
   "entryPoint": "index.html",
@@ -13,8 +13,15 @@
     "minima.rpc",
     "notifications",
     "system.read",
-    "cluster.read"
+    "cluster.read",
+    "hardware.sensors",
+    "hardware.npu"
   ],
+  "hardware": {
+    "senseHat": true,
+    "aiHat": true,
+    "m2Nvme": true
+  },
   "homepage": "https://github.com/WilliamMajanja/Zedd-Weather",
   "minPinetVersion": "1.0.0"
 }

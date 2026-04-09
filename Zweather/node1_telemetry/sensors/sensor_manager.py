@@ -3,12 +3,18 @@ Unified sensor aggregation manager.
 
 Initialises every enabled sensor driver, collects their readings into a
 single ``dict``, and provides a clean shutdown path.
+
+Hardware profile (production Raspberry Pi Weather Node):
+    - Sense HAT v2   – environmental + IMU sensors, 8×8 LED matrix
+    - AI HAT+ (Hailo-8L NPU via M.2 Key E) – on-device edge inference
+    - GPIO / I2C / Modbus peripherals
 """
 import time
 import logging
 
 from Zweather.node1_telemetry import config
 from Zweather.node1_telemetry.sensors.sense_hat_driver import SenseHatDriver
+from Zweather.node1_telemetry.sensors.ai_hat_driver import AIHatDriver
 from Zweather.node1_telemetry.sensors.gpio_sensors import RainGaugeSensor
 from Zweather.node1_telemetry.sensors.uv_sensor import UVSensor
 from Zweather.node1_telemetry.sensors.enviro_plus import EnviroPlusSensor
@@ -23,6 +29,7 @@ class SensorManager:
     def __init__(self):
         self._drivers = []
         self._sense_hat: SenseHatDriver | None = None
+        self._ai_hat: AIHatDriver | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -36,6 +43,12 @@ class SensorManager:
             driver.initialize()
             self._drivers.append(driver)
             self._sense_hat = driver
+
+        if config.AI_HAT_ENABLED:
+            ai_driver = AIHatDriver()
+            ai_driver.initialize()
+            self._drivers.append(ai_driver)
+            self._ai_hat = ai_driver
 
         rain = RainGaugeSensor()
         rain.initialize()
@@ -80,6 +93,14 @@ class SensorManager:
     def sense_hat(self) -> SenseHatDriver | None:
         """Return the Sense HAT driver instance (or *None*)."""
         return self._sense_hat
+
+    # ------------------------------------------------------------------
+    # AI HAT access (for NPU inference)
+    # ------------------------------------------------------------------
+    @property
+    def ai_hat(self) -> AIHatDriver | None:
+        """Return the AI HAT driver instance (or *None*)."""
+        return self._ai_hat
 
     # ------------------------------------------------------------------
     # Cleanup

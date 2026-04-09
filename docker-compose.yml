@@ -85,6 +85,7 @@ services:
       # linux/arm64 via QEMU for production image creation.
     container_name: zedd-edge
     restart: unless-stopped
+    privileged: true
     env_file:
       - .env
     environment:
@@ -93,19 +94,23 @@ services:
       INFLUXDB_BUCKET: ${DOCKER_INFLUXDB_INIT_BUCKET:-telemetry}
       INFLUXDB_TOKEN:  ${INFLUXDB_TOKEN:-dev-token-changeme}
       PUBLISH_INTERVAL:       ${PUBLISH_INTERVAL:-10.0}
-      SENSE_HAT_ENABLED:      ${SENSE_HAT_ENABLED:-false}
+      SENSE_HAT_ENABLED:      ${SENSE_HAT_ENABLED:-true}
       SENSE_HAT_TEMP_OFFSET:  ${SENSE_HAT_TEMP_OFFSET:-2.0}
+      AI_HAT_ENABLED:         ${AI_HAT_ENABLED:-true}
+      AI_HAT_MODEL_PATH:      ${AI_HAT_MODEL_PATH:-/opt/zedd/models/weather_classify.hef}
+      M2_NVME_ENABLED:        ${M2_NVME_ENABLED:-false}
+      M2_NVME_PATH:           ${M2_NVME_PATH:-/mnt/nvme}
       NODE_NAME:              ${NODE_NAME:-dev-node}
       SQLITE_DB_PATH:         /tmp/zedd_buffer.db
       LOG_LEVEL:              ${LOG_LEVEL:-INFO}
+    devices:
+      - /dev/i2c-1:/dev/i2c-1
+      - /dev/hailo0:/dev/hailo0
+    volumes:
+      - /opt/zedd/models:/opt/zedd/models:ro
     depends_on:
       influxdb:
         condition: service_healthy
-    # In production the pod runs privileged with /dev/i2c-1 mounted.
-    # Uncomment below if testing against real hardware locally:
-    # devices:
-    #   - /dev/i2c-1:/dev/i2c-1
-    # privileged: true
 
 # ---------------------------------------------------------------------------
 # Named volumes (persist data between container restarts)

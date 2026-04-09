@@ -27,7 +27,7 @@ COPY Zweather/requirements.txt requirements.txt
 RUN pip install --upgrade pip && \
     pip install --prefix=/install --no-cache-dir \
         $(grep -v -E \
-            '^\s*(sense-hat|RPi\.GPIO|gpiozero|enviroplus|pimoroni-bme280|pimoroni-ltr559|pms5003)' \
+            '^\s*(sense-hat|RPi\.GPIO|gpiozero|enviroplus|pimoroni-bme280|pimoroni-ltr559|pms5003|hailort)' \
             requirements.txt \
           | grep -v '^\s*#' \
           | grep -v '^\s*$')
