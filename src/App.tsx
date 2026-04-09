@@ -754,7 +754,7 @@ export default function App() {
     const hexHash = '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     
     setAttestations(prev => [
-      { id: hexHash, time: 'Just now', type: 'Telemetry Shard', verified: true },
+      { id: hexHash, time: 'Just now', type: 'Manual Shard', verified: true },
       ...prev.slice(0, 3) // Keep only the latest 4
     ]);
     setIsGeneratingProof(false);
@@ -1802,7 +1802,7 @@ export default function App() {
                       <Terminal className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm font-mono text-slate-300 break-all">{att.id.slice(0, 18)}...{att.id.slice(-8)}</p>
+                      <p className="text-xs sm:text-sm font-mono text-slate-300 break-all">{att.id.slice(0, 26)}...{att.id.slice(-8)}</p>
                       <p className="text-[10px] sm:text-xs text-slate-500 mt-1">{att.type} • {att.time}</p>
                     </div>
                   </div>

@@ -133,11 +133,13 @@ def inference_worker():
             logger.info("Processing new telemetry payload...")
             
             # 1. Fetch Macro-Forecast using configured site coordinates
-            site_lat = float(os.getenv("SITE_LATITUDE", "0"))
-            site_lon = float(os.getenv("SITE_LONGITUDE", "0"))
-            if site_lat == 0 and site_lon == 0:
+            raw_lat = os.getenv("SITE_LATITUDE")
+            raw_lon = os.getenv("SITE_LONGITUDE")
+            if raw_lat is None or raw_lon is None:
                 logger.warning("Site coordinates not configured. Set SITE_LATITUDE and SITE_LONGITUDE env vars.")
-            forecast = fetch_meteomatics_forecast(lat=site_lat, lon=site_lon)
+                forecast = fetch_meteomatics_forecast(lat=0, lon=0)
+            else:
+                forecast = fetch_meteomatics_forecast(lat=float(raw_lat), lon=float(raw_lon))
             
             # 2. Edge AI Inference
             strategy = generate_mitigation_strategy(telemetry=payload, forecast=forecast)

@@ -22,8 +22,10 @@ METEOMATICS_PASS = os.environ.get("METEOMATICS_PASS", "")
 METEOMATICS_URL = os.environ.get("METEOMATICS_URL", "https://api.meteomatics.com")
 
 # Site coordinates – override with SITE_LATITUDE / SITE_LONGITUDE env vars
-SITE_LAT = float(os.environ.get("SITE_LATITUDE", "0"))
-SITE_LON = float(os.environ.get("SITE_LONGITUDE", "0"))
+_raw_lat = os.environ.get("SITE_LATITUDE")
+_raw_lon = os.environ.get("SITE_LONGITUDE")
+SITE_LAT = float(_raw_lat) if _raw_lat is not None else None
+SITE_LON = float(_raw_lon) if _raw_lon is not None else None
 
 class ZeddOrchestrator:
     def __init__(self):
@@ -50,7 +52,7 @@ class ZeddOrchestrator:
             logging.warning("Meteomatics credentials not configured. Set METEOMATICS_USER and METEOMATICS_PASS.")
             return None
 
-        if SITE_LAT == 0 and SITE_LON == 0:
+        if SITE_LAT is None or SITE_LON is None:
             logging.warning("Site coordinates not configured. Set SITE_LATITUDE and SITE_LONGITUDE.")
             return None
 
