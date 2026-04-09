@@ -1,6 +1,11 @@
 """
 Centralized configuration for the Node 1 telemetry system.
 All hardware pins, MQTT settings, thresholds, and sensor toggles live here.
+
+Hardware profile (production Raspberry Pi Weather Node):
+    - Sense HAT v2   – environmental + IMU sensors, 8×8 LED matrix
+    - AI HAT+ (Hailo-8L NPU via M.2 Key E) – on-device edge inference
+    - M.2 NVMe SSD   – fast local telemetry buffer and model storage
 """
 import os
 
@@ -20,6 +25,26 @@ SENSE_HAT_ENABLED = os.getenv("SENSE_HAT_ENABLED", "true").lower() == "true"
 # CPU temperature compensation factor (Sense HAT reads ~2 °C high due to
 # proximity to the Pi CPU).  Subtract this from the raw reading.
 SENSE_HAT_TEMP_OFFSET = float(os.getenv("SENSE_HAT_TEMP_OFFSET", "2.0"))
+
+# ---------------------------------------------------------------------------
+# AI HAT+ (Hailo-8L NPU – M.2 Key E accelerator)
+# ---------------------------------------------------------------------------
+AI_HAT_ENABLED = os.getenv("AI_HAT_ENABLED", "true").lower() == "true"
+# Path to the compiled HEF (Hailo Executable Format) weather-classification model.
+AI_HAT_MODEL_PATH = os.getenv(
+    "AI_HAT_MODEL_PATH", "/opt/zedd/models/weather_classify.hef"
+)
+# Hailo device identifier (/dev/hailo0 is default for single-NPU setups).
+AI_HAT_DEVICE_ID = os.getenv("AI_HAT_DEVICE_ID", "/dev/hailo0")
+
+# ---------------------------------------------------------------------------
+# M.2 NVMe storage
+# ---------------------------------------------------------------------------
+# When an M.2 NVMe SSD is present, use it for the telemetry buffer and
+# model artifacts instead of the SD card.  Falls back to /tmp on non-NVMe
+# setups.
+M2_NVME_PATH = os.getenv("M2_NVME_PATH", "/mnt/nvme")
+M2_NVME_ENABLED = os.getenv("M2_NVME_ENABLED", "false").lower() == "true"
 
 # ---------------------------------------------------------------------------
 # GPIO – Rain Gauge (Tipping Bucket)

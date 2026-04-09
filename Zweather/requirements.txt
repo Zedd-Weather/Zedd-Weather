@@ -32,6 +32,9 @@ google-genai>=1.0.0
 aiohttp>=3.13.3
 python-dotenv>=1.0.0
 
+# Raspberry Pi AI HAT+ (Hailo-8L NPU)
+hailort>=4.18.0; platform_machine == "aarch64" or platform_machine == "armv7l"
+
 # Testing
 pytest>=8.0.0
 pytest-mock>=3.0.0
