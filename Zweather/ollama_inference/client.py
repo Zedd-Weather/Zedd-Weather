@@ -45,7 +45,7 @@ class OllamaClient:
             import requests  # type: ignore
             resp = requests.get(f"{self.base_url}/api/tags", timeout=5)
             return resp.status_code == 200
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError) as exc:
             logger.debug("Ollama health check failed: %s", exc)
             return False
 
@@ -190,7 +190,7 @@ Be specific and practical. Limit response to 250 words."""
             resp.raise_for_status()
             data = resp.json()
             return data.get("response", "").strip()
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, KeyError) as exc:
             logger.error("Ollama generation failed: %s", exc)
             return f"Ollama error: {exc}"
 
@@ -201,12 +201,18 @@ Be specific and practical. Limit response to 250 words."""
             model = "gemini-1.5-flash"
             url = (
                 f"https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{model}:generateContent?key={self._gemini_key}"
+                f"{model}:generateContent"
             )
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": self._gemini_key or "",
+            }
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}]
             }
-            resp = requests.post(url, json=payload, timeout=_REQUEST_TIMEOUT)
+            resp = requests.post(
+                url, json=payload, headers=headers, timeout=_REQUEST_TIMEOUT
+            )
             resp.raise_for_status()
             data = resp.json()
             candidates = data.get("candidates", [])
@@ -214,6 +220,6 @@ Be specific and practical. Limit response to 250 words."""
                 parts = candidates[0].get("content", {}).get("parts", [])
                 return " ".join(p.get("text", "") for p in parts).strip()
             return "Gemini returned no candidates."
-        except Exception as exc:  # noqa: BLE001
+        except (requests.RequestException, json.JSONDecodeError, KeyError) as exc:
             logger.error("Gemini fallback failed: %s", exc)
             return f"Gemini error: {exc}"

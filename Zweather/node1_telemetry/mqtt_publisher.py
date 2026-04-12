@@ -81,14 +81,22 @@ def main():
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
 
+    max_retries = 30
+    retry_count = 0
     while True:
         try:
             client.connect(config.MQTT_BROKER, config.MQTT_PORT, keepalive=60)
             client.loop_start()
             break
         except (socket.error, ConnectionRefusedError) as exc:
-            logger.error("MQTT connection failed: %s. Retrying in 5 s …", exc)
-            time.sleep(5)
+            retry_count += 1
+            if retry_count >= max_retries:
+                logger.critical("MQTT connection failed after %d retries. Exiting.", max_retries)
+                sensor_mgr.cleanup()
+                return
+            backoff = min(5 * retry_count, 60)
+            logger.error("MQTT connection failed (%d/%d): %s. Retrying in %d s …", retry_count, max_retries, exc, backoff)
+            time.sleep(backoff)
 
     # 4. Publish loop
     try:

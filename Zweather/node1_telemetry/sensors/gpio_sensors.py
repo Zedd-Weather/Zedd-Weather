@@ -77,8 +77,8 @@ class RainGaugeSensor(BaseSensor):
         with self._lock:
             tips = self._tip_count
             self._tip_count = 0
-        elapsed = max(now - self._last_read_time, 0.001)
-        self._last_read_time = now
+            elapsed = max(now - self._last_read_time, 0.001)
+            self._last_read_time = now
 
         interval_mm = round(tips * config.RAIN_GAUGE_MM_PER_TIP, 4)
         rate_mm_h = round((interval_mm / elapsed) * 3600, 2)

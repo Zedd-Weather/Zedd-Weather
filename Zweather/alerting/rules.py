@@ -177,7 +177,10 @@ class AlertRulesEngine:
             raw = telemetry.get(rule.metric)
             if raw is None:
                 continue
-            value = float(raw)
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):
+                continue
             if self._matches(value, rule.condition, rule.threshold):
                 alerts.append(Alert(
                     id=str(uuid.uuid4()),

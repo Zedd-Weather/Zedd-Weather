@@ -323,7 +323,7 @@ export default function App() {
   useEffect(() => {
     const saved = localStorage.getItem('zedd_sharding_locker');
     if (saved) {
-      try { setLockerEntries(JSON.parse(saved)); } catch (e) {}
+      try { setLockerEntries(JSON.parse(saved)); } catch (_) { /* corrupted localStorage entry */ }
     }
   }, []);
 
@@ -568,7 +568,7 @@ export default function App() {
   // Fetch telemetry on mount and set interval
   useEffect(() => {
     let isMounted = true;
-    let interval: any;
+    let interval: ReturnType<typeof setInterval> | undefined;
     
     const init = async () => {
       let location = DEFAULT_LOCATION;
@@ -611,20 +611,8 @@ export default function App() {
   const [mapLinks, setMapLinks] = useState<any[]>([]);
   const [isLocating, setIsLocating] = useState(false);
 
-  // Initial Geolocation
-  useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setPiLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-        },
-        (error) => {
-          console.warn("Initial geolocation failed or denied.", error);
-        },
-        { timeout: 5000 }
-      );
-    }
-  }, []);
+  // NOTE: Geolocation is already handled in the telemetry init useEffect above.
+  // No duplicate geolocation call needed here.
 
   const locateMe = async () => {
     setIsLocating(true);
@@ -691,6 +679,7 @@ export default function App() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     setIsExportModalOpen(false);
   };
 
@@ -797,6 +786,10 @@ export default function App() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setMediaFile(file);
+      // Revoke any previous preview URL to avoid memory leaks
+      if (mediaPreview) {
+        URL.revokeObjectURL(mediaPreview);
+      }
       setMediaPreview(URL.createObjectURL(file));
       setRiskReport(null);
     }

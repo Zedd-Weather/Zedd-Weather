@@ -24,8 +24,19 @@ METEOMATICS_URL = os.environ.get("METEOMATICS_URL", "https://api.meteomatics.com
 # Site coordinates – override with SITE_LATITUDE / SITE_LONGITUDE env vars
 _raw_lat = os.environ.get("SITE_LATITUDE")
 _raw_lon = os.environ.get("SITE_LONGITUDE")
-SITE_LAT = float(_raw_lat) if _raw_lat is not None else None
-SITE_LON = float(_raw_lon) if _raw_lon is not None else None
+try:
+    SITE_LAT = float(_raw_lat) if _raw_lat is not None else None
+    SITE_LON = float(_raw_lon) if _raw_lon is not None else None
+    if SITE_LAT is not None and not (-90 <= SITE_LAT <= 90):
+        logging.warning("SITE_LATITUDE %.4f out of range [-90, 90].", SITE_LAT)
+        SITE_LAT = None
+    if SITE_LON is not None and not (-180 <= SITE_LON <= 180):
+        logging.warning("SITE_LONGITUDE %.4f out of range [-180, 180].", SITE_LON)
+        SITE_LON = None
+except ValueError as exc:
+    logging.error("Invalid SITE_LATITUDE/SITE_LONGITUDE: %s", exc)
+    SITE_LAT = None
+    SITE_LON = None
 
 class ZeddOrchestrator:
     def __init__(self):
@@ -41,10 +52,10 @@ class ZeddOrchestrator:
 
     def on_message(self, client, userdata, msg):
         try:
-            self.latest_telemetry = json.loads(msg.payload.decode())
+            self.latest_telemetry = json.loads(msg.payload.decode("utf-8", errors="replace"))
             logging.debug(f"Received telemetry: {self.latest_telemetry}")
-        except json.JSONDecodeError:
-            logging.error("Invalid payload received.")
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            logging.error("Invalid payload received: %s", exc)
 
     async def fetch_macro_forecast(self):
         """Ingests 5-day macro-meteorological forecasts via Meteomatics API."""
@@ -111,7 +122,8 @@ class ZeddOrchestrator:
         return attestation_record
 
     async def orchestration_loop(self):
-        self.session = aiohttp.ClientSession()
+        timeout = aiohttp.ClientTimeout(total=30)
+        self.session = aiohttp.ClientSession(timeout=timeout)
         
         # Start MQTT loop in background thread
         self.mqtt_client.connect_async(MQTT_BROKER, MQTT_PORT, 60)

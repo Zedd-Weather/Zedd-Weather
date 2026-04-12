@@ -27,10 +27,10 @@ services:
     environment:
       DOCKER_INFLUXDB_INIT_MODE:     ${DOCKER_INFLUXDB_INIT_MODE:-setup}
       DOCKER_INFLUXDB_INIT_USERNAME: ${DOCKER_INFLUXDB_INIT_USERNAME:-admin}
-      DOCKER_INFLUXDB_INIT_PASSWORD: ${DOCKER_INFLUXDB_INIT_PASSWORD:-changeme123}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${DOCKER_INFLUXDB_INIT_PASSWORD:?Set DOCKER_INFLUXDB_INIT_PASSWORD in .env}
       DOCKER_INFLUXDB_INIT_ORG:      ${DOCKER_INFLUXDB_INIT_ORG:-zedd-weather}
       DOCKER_INFLUXDB_INIT_BUCKET:   ${DOCKER_INFLUXDB_INIT_BUCKET:-telemetry}
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-dev-token-changeme}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:?Set INFLUXDB_TOKEN in .env}
       DOCKER_INFLUXDB_INIT_RETENTION: "30d"
     volumes:
       - influxdb-data:/var/lib/influxdb2
@@ -51,7 +51,7 @@ services:
       - "3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER:     ${GF_SECURITY_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-changeme123}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:?Set GF_SECURITY_ADMIN_PASSWORD in .env}
       GF_SERVER_ROOT_URL:         ${GF_SERVER_ROOT_URL:-http://localhost:3000}
       GF_INSTALL_PLUGINS:         "grafana-clock-panel,grafana-simple-json-datasource"
     volumes:
@@ -92,7 +92,7 @@ services:
       INFLUXDB_URL:    http://influxdb:8086
       INFLUXDB_ORG:    ${DOCKER_INFLUXDB_INIT_ORG:-zedd-weather}
       INFLUXDB_BUCKET: ${DOCKER_INFLUXDB_INIT_BUCKET:-telemetry}
-      INFLUXDB_TOKEN:  ${INFLUXDB_TOKEN:-dev-token-changeme}
+      INFLUXDB_TOKEN:  ${INFLUXDB_TOKEN:?Set INFLUXDB_TOKEN in .env}
       PUBLISH_INTERVAL:       ${PUBLISH_INTERVAL:-10.0}
       SENSE_HAT_ENABLED:      ${SENSE_HAT_ENABLED:-true}
       SENSE_HAT_TEMP_OFFSET:  ${SENSE_HAT_TEMP_OFFSET:-2.0}
@@ -108,6 +108,12 @@ services:
       - /dev/hailo0:/dev/hailo0
     volumes:
       - /opt/zedd/models:/opt/zedd/models:ro
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/zedd-alive"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       influxdb:
         condition: service_healthy
