@@ -30,7 +30,8 @@ import {
   Bell,
   BellOff,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  HardHat
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -48,8 +49,9 @@ import {
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
 import { Toaster, toast } from 'sonner';
+import ConstructionDashboard from './components/ConstructionDashboard';
 
-type TabId = 'telemetry' | 'risk' | 'map' | 'forecast' | 'locker';
+type TabId = 'telemetry' | 'risk' | 'map' | 'forecast' | 'locker' | 'construction';
 interface GeoLocation { lat: number; lng: number; }
 
 // Hourly data populated from Open-Meteo in fetchRealTelemetry()
@@ -74,6 +76,7 @@ const API_BASE = {
 
 const TABS: { id: TabId; label: string; icon: typeof Activity }[] = [
   { id: 'telemetry', label: 'Telemetry', icon: Activity },
+  { id: 'construction', label: 'Construction DSS', icon: HardHat },
   { id: 'risk', label: 'AI Risk Analysis', icon: AlertTriangle },
   { id: 'map', label: 'Site Map & Logistics', icon: MapIcon },
   { id: 'forecast', label: 'Forecast Grounding', icon: CalendarDays },
@@ -1628,6 +1631,10 @@ export default function App() {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'construction' && (
+          <ConstructionDashboard weather={currentTelemetry} />
         )}
 
         {activeTab === 'locker' && (
