@@ -197,6 +197,30 @@ export default function App() {
   const [riskLevel, setRiskLevel] = useState<'Green' | 'Amber' | 'Red' | 'Black' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Sector Switch State for AI Risk Analysis
+  const [riskSector, setRiskSector] = useState<'construction' | 'agricultural' | 'industrial'>('construction');
+
+  const SECTOR_CONFIG = {
+    construction: {
+      label: 'Construction',
+      description: 'an industrial construction site',
+      focusAreas: 'structural risks, worker safety, material integrity, and construction-specific hazards',
+      icon: '🏗️',
+    },
+    agricultural: {
+      label: 'Agricultural',
+      description: 'an agricultural farm or plantation',
+      focusAreas: 'crop health, irrigation needs, pest/disease risk, soil conditions, and weather stress on agriculture',
+      icon: '🌾',
+    },
+    industrial: {
+      label: 'Industrial',
+      description: 'an industrial manufacturing facility or plant',
+      focusAreas: 'equipment safety, process risks, supply chain disruption, air quality, and worker exposure limits',
+      icon: '🏭',
+    },
+  } as const;
+
   // Pi Location State
   const [piLocation, setPiLocation] = useState<GeoLocation>(DEFAULT_LOCATION);
 
@@ -387,13 +411,16 @@ export default function App() {
     setActiveTab('risk');
     
     try {
+      const sectorCfg = SECTOR_CONFIG[riskSector];
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `You are a Principal Edge AI and IoT Systems Architect.
+        contents: `You are a Principal Edge AI and IoT Systems Architect monitoring ${sectorCfg.description}.
+        Sector: ${sectorCfg.label}.
         Here is the 7-day weather forecast for the site:
         ${JSON.stringify(forecastData, null, 2)}
         
-        Analyze this forecast for any upcoming environmental or structural risks.
+        Analyze this forecast for any upcoming risks relevant to ${sectorCfg.description}.
+        Focus on: ${sectorCfg.focusAreas}.
         Provide strict mitigation directives that will be cryptographically signed to the ledger.`,
         config: {
           responseMimeType: "application/json",
@@ -483,9 +510,11 @@ export default function App() {
     setIsAnalyzing(true);
     setDirectiveShards([]);
     try {
+      const sectorCfg = SECTOR_CONFIG[riskSector];
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `You are a Principal Edge AI and IoT Systems Architect monitoring an industrial construction site.
+        contents: `You are a Principal Edge AI and IoT Systems Architect monitoring ${sectorCfg.description}.
+        Sector: ${sectorCfg.label}.
         Current LIVE micro-climate telemetry:
         - Temperature: ${telemetry.temp.toFixed(1)}°C
         - Humidity: ${telemetry.humidity.toFixed(1)}%
@@ -495,7 +524,8 @@ export default function App() {
         - UV Index: ${telemetry.uvIndex.toFixed(1)}
         - AQI: ${Math.round(telemetry.aqi)}
 
-        Based purely on this real-time telemetry, identify any environmental or structural risks for the construction site.
+        Based purely on this real-time telemetry, identify any environmental risks relevant to ${sectorCfg.description}.
+        Focus on: ${sectorCfg.focusAreas}.
         Provide strict mitigation directives that will be cryptographically signed to the ledger. Do not ask for images, base your analysis solely on the data provided.`,
         config: {
           responseMimeType: "application/json",
@@ -793,7 +823,8 @@ export default function App() {
                 mimeType: mediaFile.type
               }
             },
-            `You are a Principal Edge AI and IoT Systems Architect analyzing a construction site. 
+            `You are a Principal Edge AI and IoT Systems Architect analyzing ${SECTOR_CONFIG[riskSector].description}.
+            Sector: ${SECTOR_CONFIG[riskSector].label}.
             Current live micro-climate telemetry from Sense HAT: 
             - Temperature: ${currentTelemetry.temp.toFixed(1)}°C
             - Humidity: ${currentTelemetry.humidity.toFixed(1)}%
@@ -803,8 +834,9 @@ export default function App() {
             - UV Index: ${currentTelemetry.uvIndex.toFixed(1)}
             - AQI: ${Math.round(currentTelemetry.aqi)}
             
-            Analyze this media of the construction site. Identify any environmental or structural risks, 
-            and provide strict mitigation directives that will be cryptographically signed to the ledger.`
+            Analyze this media of the site. Identify any risks relevant to ${SECTOR_CONFIG[riskSector].description}.
+            Focus on: ${SECTOR_CONFIG[riskSector].focusAreas}.
+            Provide strict mitigation directives that will be cryptographically signed to the ledger.`
           ],
           config: {
             responseMimeType: "application/json",
@@ -1266,6 +1298,33 @@ export default function App() {
         )}
 
         {activeTab === 'risk' && (
+          <div className="space-y-6">
+            {/* Sector Switch */}
+            <div className="bg-[#111] border border-slate-800 rounded-xl p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <span className="text-sm font-medium text-slate-400">Sector:</span>
+                <div className="flex rounded-lg border border-slate-700 overflow-hidden">
+                  {(Object.keys(SECTOR_CONFIG) as Array<keyof typeof SECTOR_CONFIG>).map((key) => (
+                    <button
+                      key={key}
+                      onClick={() => setRiskSector(key)}
+                      className={`px-4 py-2 text-sm font-medium transition-colors flex items-center gap-2 ${
+                        riskSector === key
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                      }`}
+                    >
+                      <span>{SECTOR_CONFIG[key].icon}</span>
+                      {SECTOR_CONFIG[key].label}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-xs text-slate-500 ml-auto hidden sm:block">
+                  AI analysis tailored for {SECTOR_CONFIG[riskSector].label.toLowerCase()} operations
+                </span>
+              </div>
+            </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="space-y-8">
               <div className="bg-[#111] border border-slate-800 rounded-xl p-6">
@@ -1325,7 +1384,7 @@ export default function App() {
                   Add Visual Context (Optional)
                 </h2>
                 <p className="text-sm text-slate-400 mb-6">
-                  Upload images or video of the construction site to cross-reference visual data with the live telemetry.
+                  Upload images or video of the {SECTOR_CONFIG[riskSector].label.toLowerCase()} site to cross-reference visual data with the live telemetry.
                 </p>
                 
                 <div 
@@ -1458,6 +1517,7 @@ export default function App() {
                 )}
               </div>
             </div>
+          </div>
           </div>
         )}
 
