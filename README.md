@@ -1,7 +1,11 @@
 # Zedd Weather Dashboard
 
-Zedd Weather is an edge telemetry and risk-analysis platform for industrial and agricultural monitoring.  
-This repository contains a React frontend, Python telemetry services, and Docker-based local deployment assets.
+[![CI – Lint, Test & Build](https://github.com/WilliamMajanja/Zedd-Weather/actions/workflows/ci.yml/badge.svg)](https://github.com/WilliamMajanja/Zedd-Weather/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/WilliamMajanja/Zedd-Weather/actions/workflows/codeql.yml/badge.svg)](https://github.com/WilliamMajanja/Zedd-Weather/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+Zedd Weather is an edge telemetry and risk-analysis platform for industrial, agricultural, and construction monitoring.  
+This repository contains a React frontend, Python telemetry services, a FastAPI REST API, and Docker-based local deployment assets.
 
 It runs as a **PiNet DApp** on a Raspberry Pi Weather Node cluster with real hardware:
 
@@ -15,12 +19,15 @@ It runs as a **PiNet DApp** on a Raspberry Pi Weather Node cluster with real har
 
 - **Hardware-first** — reads from real Sense HAT sensors (falls back to simulation when hardware is absent)
 - **On-device AI** — Hailo-8L NPU runs weather-classification inference at the edge
+- **Sector-specific risk analysis** — construction, agricultural, and industrial heuristic engines
+- **Configurable alert system** — rule-based alerts with severity levels and threshold tuning
 - Live telemetry ingestion and visualization
 - AI-assisted mitigation guidance (NPU → Ollama → Gemini fallback chain)
 - InfluxDB time-series storage
 - Grafana dashboards
 - Open WebUI integration
 - PiNet OS DApp with blockchain attestation
+- FastAPI REST API for headless / programmatic access
 
 ## Three-Node Local Cluster Roles
 
@@ -34,12 +41,28 @@ It runs as a **PiNet DApp** on a Raspberry Pi Weather Node cluster with real har
 
 ```text
 .
-├── docker-compose.yml             # Core local stack (control plane + storage workloads)
-├── docker-compose.cluster.yml     # Local three-node role simulation (AI + sensory workers + MQTT)
-├── Zweather/                      # Python telemetry + orchestration services
-├── src/                           # React frontend (Vite + React 19 + TypeScript)
+├── src/                           # React 19 + TypeScript frontend (Vite)
+│   ├── components/                #   Page components and shared UI
+│   ├── hooks/                     #   Custom React hooks (telemetry, alerts, forecast, …)
+│   ├── types/                     #   TypeScript type definitions
+│   └── lib/                       #   RAG pipeline, evaluation metrics, utilities
+├── Zweather/                      # Python backend services
+│   ├── node1_telemetry/           #   Sensor drivers, MQTT publisher, config
+│   ├── node2_orchestration/       #   MQTT subscriber, AI inference, attestation
+│   ├── ollama_inference/          #   Gemini / Ollama / Hailo NPU inference clients
+│   ├── construction/              #   Construction sector risk engine
+│   ├── agricultural/              #   Agricultural sector risk engine (+ forecasting)
+│   ├── industrial/                #   Industrial sector risk engine
+│   ├── alerting/                  #   Rule-based alert engine + notification channels
+│   ├── api.py                     #   FastAPI REST API
+│   ├── app.py                     #   Edge collector entry point
+│   └── tests/                     #   Pytest test suite
+├── docker-compose.yml             # Core local stack (control plane + storage)
+├── docker-compose.cluster.yml     # Three-node cluster simulation (AI + sensory workers + MQTT)
+├── Dockerfile                     # Multi-stage Docker image (arm64 + amd64)
 ├── mosquitto/                     # Mosquitto MQTT broker config
-└── .github/workflows/             # CI workflows (lint, test, build)
+├── public/                        # Static assets incl. PiNet DApp manifest
+└── .github/workflows/             # CI workflows (lint, test, build, CodeQL)
 ```
 
 ## Quick Start (Local)
@@ -165,13 +188,66 @@ Set sensor toggles in `.env` (`SENSE_HAT_ENABLED`, `ENVIRO_PLUS_ENABLED`, etc.) 
 
 ## CI
 
-The GitHub workflows run:
+The GitHub Actions workflows run:
 - Python lint (flake8, mypy)
 - Python tests (pytest)
-- TypeScript lint (`tsc --noEmit`)
+- TypeScript type-check (`tsc --noEmit`)
 - Vite production build
-- Multi-arch Docker build
+- Multi-arch Docker build (arm64 + amd64)
+- CodeQL security analysis (JavaScript/TypeScript + Python) — weekly and on every PR
+
+## REST API
+
+The FastAPI backend (`Zweather/api.py`) exposes these endpoints:
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/health` | Service health check |
+| `POST` | `/api/analyze` | Run sector-specific risk analysis on telemetry data |
+| `POST` | `/api/alerts` | Evaluate alert rules against telemetry data |
+
+Start the API server locally:
+
+```bash
+uvicorn Zweather.api:app --host 0.0.0.0 --port 8000
+```
+
+Interactive docs are available at `http://localhost:8000/docs` (Swagger UI).
+
+## Sector Risk Engines
+
+Zedd Weather includes three heuristic risk-analysis engines that evaluate weather telemetry against sector-specific thresholds — no AI API key required.
+
+| Sector | Module | Activities / Profiles |
+|---|---|---|
+| **Construction** | `Zweather/construction/` | 7 activity profiles (e.g. concrete pouring, crane operations, excavation) |
+| **Agricultural** | `Zweather/agricultural/` | 5 crop profiles (e.g. maize, wheat, vegetables) + forecasting |
+| **Industrial** | `Zweather/industrial/` | 6 facility profiles (manufacturing, power plant, chemical, warehouse, refinery, general) |
+
+## Alert System
+
+The rule-based alert engine (`Zweather/alerting/`) evaluates telemetry against configurable thresholds and returns alerts sorted by severity. Thresholds can be tuned via environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `ALERT_TEMP_HIGH_C` | `35.0` | High temperature alert (°C) |
+| `ALERT_TEMP_LOW_C` | `0.0` | Low temperature alert (°C) |
+| `ALERT_WIND_SPEED_MS` | `20.0` | High wind speed alert (m/s) |
+| `ALERT_UV_INDEX` | `8.0` | UV index alert |
+| `ALERT_AQI` | `150.0` | Air quality index alert |
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, and the pull request process.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for our security policy, responsible disclosure process, and edge node hardening guidance.
+
+## Code of Conduct
+
+This project follows the Contributor Covenant. See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ## License
 
-MIT
+[MIT](LICENSE)
