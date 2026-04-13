@@ -29,6 +29,8 @@ import SiteMapPanel from './components/SiteMapPanel';
 import ForecastPanel from './components/ForecastPanel';
 import ShardingLocker from './components/ShardingLocker';
 import ConstructionDashboard from './components/ConstructionDashboard';
+import { WelcomeOverlay } from './components/ui/WelcomeOverlay';
+import type { SectorId } from './types/risk';
 
 type TabId = 'weather' | 'safety' | 'forecast' | 'more';
 type MoreSubTab = 'locker' | 'sitemap';
@@ -38,6 +40,7 @@ export default function App() {
   const [moreSubTab, setMoreSubTab] = useState<MoreSubTab>('locker');
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showConstruction, setShowConstruction] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('zedd_onboarded'));
 
   // ─── Hooks ───
   const telemetry = useTelemetry();
@@ -114,9 +117,15 @@ export default function App() {
     }
   };
 
+  const handleWelcomeComplete = (sector: SectorId) => {
+    risk.setRiskSector(sector);
+    setShowWelcome(false);
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-slate-200 font-sans selection:bg-emerald-500/30">
       <Toaster position="top-right" theme="dark" richColors closeButton />
+      {showWelcome && <WelcomeOverlay onComplete={handleWelcomeComplete} />}
 
       {/* ─── Header ─── */}
       <header className="border-b border-slate-800 bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-50">

@@ -25,7 +25,7 @@ export function useRiskAnalysis(currentTelemetry: TelemetryData) {
       try {
         const sectorCfg = SECTOR_CONFIG[riskSector];
         const response = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-2.0-flash',
           contents: `You are a Principal Edge AI and IoT Systems Architect monitoring ${sectorCfg.description}.
           Sector: ${sectorCfg.label}.
           Current LIVE micro-climate telemetry:
@@ -105,7 +105,7 @@ export function useRiskAnalysis(currentTelemetry: TelemetryData) {
         const base64Data = (reader.result as string).split(',')[1];
 
         const response = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-2.0-flash',
           contents: [
             {
               inlineData: {

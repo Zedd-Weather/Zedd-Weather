@@ -34,7 +34,7 @@ export function useSiteMap(
         const lng = loc?.lng || -122.4194;
 
         const response = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-2.0-flash',
           contents: `Find nearby emergency services and hardware stores near the coordinates ${lat}, ${lng}. Provide a brief logistics report.`,
           config: {
             tools: [{ googleMaps: {} } as any],

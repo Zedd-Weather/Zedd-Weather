@@ -56,7 +56,7 @@ export function useForecast(piLocation: GeoLocation, activeTab: string) {
     ): Promise<{ riskLevel: RiskLevel; report: string }> => {
       const sectorCfg = SECTOR_CONFIG[riskSector];
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.0-flash',
         contents: `You are a Principal Edge AI and IoT Systems Architect monitoring ${sectorCfg.description}.
         Sector: ${sectorCfg.label}.
         Here is the 7-day weather forecast for the site:
