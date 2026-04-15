@@ -7,6 +7,8 @@ import { SECTOR_CONFIG } from '../types/risk';
 
 const GOOGLE_WEATHER_API_KEY = import.meta.env.VITE_GOOGLE_WEATHER_API_KEY ?? '';
 const GOOGLE_WEATHER_BASE = 'https://weather.googleapis.com/v1';
+/** Conversion factor from km/h to m/s. */
+const KMH_TO_MS = 3.6;
 
 const apiKey = process.env.GEMINI_API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
@@ -59,7 +61,7 @@ export function useForecast(piLocation: GeoLocation, activeTab: string) {
             tempMin: day.overnightForecast?.temperature?.degrees ?? 0,
             precip: day.daytimeForecast?.precipitation?.probability?.percent ?? 0,
             wind: day.daytimeForecast?.wind?.speed?.value
-              ? day.daytimeForecast.wind.speed.value / 3.6   // km/h → m/s
+              ? day.daytimeForecast.wind.speed.value / KMH_TO_MS   // km/h → m/s
               : 0,
             uv: day.daytimeForecast?.uvIndex ?? 0,
           }),

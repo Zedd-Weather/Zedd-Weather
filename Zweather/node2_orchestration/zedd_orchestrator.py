@@ -40,6 +40,8 @@ def fetch_accuweather_forecast(lat: float, lon: float) -> dict:
         }
 
     base_url = os.getenv("ACCUWEATHER_URL", "https://dataservice.accuweather.com")
+    # Conversion factor: km/h → m/s
+    kmh_to_ms = 3.6
 
     try:
         import requests  # type: ignore
@@ -92,7 +94,7 @@ def fetch_accuweather_forecast(lat: float, lon: float) -> dict:
             wind_obj = day_detail.get("Wind", {}).get("Speed", {})
             wind_kmh = wind_obj.get("Value")
             if wind_kmh is not None:
-                winds.append(wind_kmh / 3.6)  # km/h → m/s
+                winds.append(wind_kmh / kmh_to_ms)  # km/h → m/s
 
             # Precipitation probability
             precip_prob = day_detail.get("PrecipitationProbability")

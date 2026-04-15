@@ -30,7 +30,7 @@ export interface AccuWeatherData {
   temperature: number;       // °C
   windSpeed: number;         // m/s
   windGusts: number;         // m/s
-  precipitation: number;     // mm
+  precipitation: number;     // mm (total)
   humidity: number;          // %
   pressure: number;          // hPa
   visibility: number;        // m (converted from km)
@@ -48,6 +48,9 @@ export interface WeatherHazardFlags {
   lightning: boolean;
   highUV: boolean;
 }
+
+/** Conversion factor: km/h → m/s. */
+const KMH_TO_MS = 3.6;
 
 // ---------------------------------------------------------------------------
 // Default configuration — sourced from environment variables
@@ -72,7 +75,7 @@ export const HAZARD_THRESHOLDS = {
   extremeHeat: 30.0,
   /** Temperature (°C) below which cold-weather protocols activate. */
   freezing: 2.0,
-  /** Precipitation (mm/h) above which exposed work should stop. */
+  /** Precipitation (mm) above which exposed work should stop. */
   heavyRain: 4.0,
   /** Visibility (m) below which heavy plant operations halt. */
   poorVisibility: 200,
@@ -191,8 +194,8 @@ function parseAccuWeatherResponse(json: unknown): AccuWeatherData {
 
   return {
     temperature: obs?.Temperature?.Metric?.Value ?? 0,
-    windSpeed: ((obs?.Wind?.Speed?.Metric?.Value ?? 0) as number) / 3.6, // km/h → m/s
-    windGusts: ((obs?.WindGust?.Speed?.Metric?.Value ?? 0) as number) / 3.6,
+    windSpeed: ((obs?.Wind?.Speed?.Metric?.Value ?? 0) as number) / KMH_TO_MS, // km/h → m/s
+    windGusts: ((obs?.WindGust?.Speed?.Metric?.Value ?? 0) as number) / KMH_TO_MS,
     precipitation: obs?.PrecipitationSummary?.Precipitation?.Metric?.Value ?? 0,
     humidity: obs?.RelativeHumidity ?? 0,
     pressure: obs?.Pressure?.Metric?.Value ?? 0,
