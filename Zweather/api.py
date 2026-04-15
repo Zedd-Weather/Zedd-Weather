@@ -50,7 +50,7 @@ _alert_engine = AlertRulesEngine()
 # ---------------------------------------------------------------------------
 
 class TelemetryPayload(BaseModel):
-    """Weather telemetry data from sensors or Open-Meteo API."""
+    """Weather telemetry data from sensors or Google Weather API."""
     temperature: float = Field(..., description="Temperature in °C")
     humidity: float = Field(..., description="Relative humidity in %")
     pressure: float = Field(..., description="Atmospheric pressure in hPa")

@@ -1,11 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { TelemetryData, GeoLocation, HourlyWeatherPoint, HistoricalDataPoint } from '../types/telemetry';
 
-const API_BASE = {
-  weather: 'https://api.open-meteo.com/v1/forecast',
-  airQuality: 'https://air-quality-api.open-meteo.com/v1/air-quality',
-  marine: 'https://marine-api.open-meteo.com/v1/marine',
-} as const;
+const GOOGLE_WEATHER_API_KEY = import.meta.env.VITE_GOOGLE_WEATHER_API_KEY ?? '';
+const GOOGLE_WEATHER_BASE = 'https://weather.googleapis.com/v1';
 
 const DEFAULT_LOCATION: GeoLocation = { lat: 37.7749, lng: -122.4194 };
 const DEFAULT_AQI = 42;
@@ -54,41 +51,68 @@ export function useTelemetry() {
       try {
         const { lat, lng: lon } = location;
 
-        const [weatherRes, aqiRes, marineRes] = await Promise.all([
-          fetch(
-            `${API_BASE.weather}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,uv_index&hourly=temperature_2m,relative_humidity_2m,surface_pressure,precipitation_probability&timezone=auto&forecast_days=1`,
-          ),
-          fetch(`${API_BASE.airQuality}?latitude=${lat}&longitude=${lon}&current=us_aqi`),
-          fetch(`${API_BASE.marine}?latitude=${lat}&longitude=${lon}&current=wave_height`),
+        // Google Weather API — current conditions
+        const currentUrl =
+          `${GOOGLE_WEATHER_BASE}/currentConditions:lookup` +
+          `?key=${GOOGLE_WEATHER_API_KEY}`;
+        const forecastUrl =
+          `${GOOGLE_WEATHER_BASE}/forecast:lookup` +
+          `?key=${GOOGLE_WEATHER_API_KEY}`;
+
+        const [currentRes, forecastRes] = await Promise.all([
+          fetch(currentUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: { latitude: lat, longitude: lon },
+            }),
+          }),
+          fetch(forecastUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: { latitude: lat, longitude: lon },
+              days: 1,
+              hourlyForHours: 24,
+            }),
+          }),
         ]);
 
-        const weather = await weatherRes.json();
-        const aqi = await aqiRes.json();
-        const marine = await marineRes.json();
-
-        const currentHour = new Date().getHours();
-        const precipProb = weather.hourly?.precipitation_probability?.[currentHour] ?? 0;
+        const current = await currentRes.json();
+        const forecast = await forecastRes.json();
 
         const newTelemetry: TelemetryData = {
-          temp: weather.current?.temperature_2m ?? 0,
-          humidity: weather.current?.relative_humidity_2m ?? 0,
-          pressure: weather.current?.surface_pressure ?? 0,
-          precipitation: precipProb,
-          uvIndex: weather.current?.uv_index ?? 0,
-          aqi: aqi.current?.us_aqi ?? 42,
-          tide: marine.current?.wave_height ?? 1.2,
+          temp: current.temperature?.degrees ?? 0,
+          humidity: current.humidity?.percent ?? 0,
+          pressure: current.pressure?.meanSeaLevelMillibars ?? 0,
+          precipitation: current.precipitation?.probability?.percent ?? 0,
+          uvIndex: current.uvIndex ?? 0,
+          aqi: current.airQuality?.aqi ?? DEFAULT_AQI,
+          tide: DEFAULT_TIDE,
         };
 
         setExternalTelemetry(newTelemetry);
         setOnboardTelemetry(newTelemetry);
 
-        if (weather.hourly?.time) {
-          const hourly: HourlyWeatherPoint[] = weather.hourly.time.map(
-            (t: string, i: number) => ({
-              time: new Date(t).toLocaleTimeString('en-US', { hour: '2-digit', hour12: false }),
-              temp: weather.hourly.temperature_2m?.[i] ?? 0,
-              humidity: weather.hourly.relative_humidity_2m?.[i] ?? 0,
-              pressure: weather.hourly.surface_pressure?.[i] ?? 0,
+        // Parse hourly forecast data
+        const hourlyForecasts = forecast.forecastHours ?? [];
+        if (hourlyForecasts.length > 0) {
+          const hourly: HourlyWeatherPoint[] = hourlyForecasts.map(
+            (h: {
+              displayDateTime?: string;
+              temperature?: { degrees?: number };
+              humidity?: { percent?: number };
+              pressure?: { meanSeaLevelMillibars?: number };
+            }) => ({
+              time: h.displayDateTime
+                ? new Date(h.displayDateTime).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    hour12: false,
+                  })
+                : '',
+              temp: h.temperature?.degrees ?? 0,
+              humidity: h.humidity?.percent ?? 0,
+              pressure: h.pressure?.meanSeaLevelMillibars ?? 0,
             }),
           );
           setHourlyWeatherData(hourly);
@@ -110,15 +134,33 @@ export function useTelemetry() {
       try {
         const { lat, lng: lon } = location;
 
-        const res = await fetch(
-          `${API_BASE.weather}?latitude=${lat}&longitude=${lon}&past_days=${days}&hourly=temperature_2m,relative_humidity_2m,surface_pressure,precipitation_probability`,
-        );
+        // Google Weather API — historical data via history:lookup
+        const historyUrl =
+          `${GOOGLE_WEATHER_BASE}/history:lookup` +
+          `?key=${GOOGLE_WEATHER_API_KEY}`;
+
+        const res = await fetch(historyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: { latitude: lat, longitude: lon },
+            days,
+            hourly: true,
+          }),
+        });
         const data = await res.json();
 
-        if (data && data.hourly) {
-          const formattedData: HistoricalDataPoint[] = data.hourly.time.map(
-            (timeStr: string, index: number) => {
-              const date = new Date(timeStr);
+        const historyHours = data.historyHours ?? [];
+        if (historyHours.length > 0) {
+          const formattedData: HistoricalDataPoint[] = historyHours.map(
+            (h: {
+              displayDateTime?: string;
+              temperature?: { degrees?: number };
+              humidity?: { percent?: number };
+              pressure?: { meanSeaLevelMillibars?: number };
+              precipitation?: { probability?: { percent?: number } };
+            }) => {
+              const date = new Date(h.displayDateTime ?? '');
               return {
                 time: date.toLocaleDateString('en-US', {
                   month: 'short',
@@ -126,10 +168,10 @@ export function useTelemetry() {
                   hour: '2-digit',
                 }),
                 rawDate: date,
-                temp: data.hourly.temperature_2m[index],
-                humidity: data.hourly.relative_humidity_2m[index],
-                pressure: data.hourly.surface_pressure[index],
-                precipitation: data.hourly.precipitation_probability[index],
+                temp: h.temperature?.degrees ?? 0,
+                humidity: h.humidity?.percent ?? 0,
+                pressure: h.pressure?.meanSeaLevelMillibars ?? 0,
+                precipitation: h.precipitation?.probability?.percent ?? 0,
               };
             },
           );
