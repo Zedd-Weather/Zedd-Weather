@@ -5,7 +5,10 @@ import type { ForecastDay } from '../types/forecast';
 import type { RiskLevel, SectorId } from '../types/risk';
 import { SECTOR_CONFIG } from '../types/risk';
 
-const API_BASE_WEATHER = 'https://api.open-meteo.com/v1/forecast';
+const GOOGLE_WEATHER_API_KEY = import.meta.env.VITE_GOOGLE_WEATHER_API_KEY ?? '';
+const GOOGLE_WEATHER_BASE = 'https://weather.googleapis.com/v1';
+/** Conversion factor from km/h to m/s. */
+const KMH_TO_MS = 3.6;
 
 const apiKey = process.env.GEMINI_API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
@@ -18,23 +21,51 @@ export function useForecast(piLocation: GeoLocation, activeTab: string) {
     if (!piLocation) return;
     setIsFetchingForecast(true);
     try {
-      const res = await fetch(
-        `${API_BASE_WEATHER}?latitude=${piLocation.lat}&longitude=${piLocation.lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,uv_index_max&timezone=auto`,
-      );
+      const forecastUrl =
+        `${GOOGLE_WEATHER_BASE}/forecast:lookup` +
+        `?key=${GOOGLE_WEATHER_API_KEY}`;
+
+      const res = await fetch(forecastUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          location: { latitude: piLocation.lat, longitude: piLocation.lng },
+          days: 7,
+        }),
+      });
       const data = await res.json();
-      if (data && data.daily) {
-        const formatted: ForecastDay[] = data.daily.time.map((timeStr: string, i: number) => ({
-          date: new Date(timeStr).toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
+
+      const dailyForecasts = data.forecastDays ?? [];
+      if (dailyForecasts.length > 0) {
+        const formatted: ForecastDay[] = dailyForecasts.map(
+          (day: {
+            displayDate?: string;
+            daytimeForecast?: {
+              temperature?: { degrees?: number };
+              wind?: { speed?: { value?: number } };
+              uvIndex?: number;
+              precipitation?: { probability?: { percent?: number } };
+            };
+            overnightForecast?: {
+              temperature?: { degrees?: number };
+            };
+          }) => ({
+            date: day.displayDate
+              ? new Date(day.displayDate).toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                })
+              : '',
+            tempMax: day.daytimeForecast?.temperature?.degrees ?? 0,
+            tempMin: day.overnightForecast?.temperature?.degrees ?? 0,
+            precip: day.daytimeForecast?.precipitation?.probability?.percent ?? 0,
+            wind: day.daytimeForecast?.wind?.speed?.value
+              ? day.daytimeForecast.wind.speed.value / KMH_TO_MS   // km/h → m/s
+              : 0,
+            uv: day.daytimeForecast?.uvIndex ?? 0,
           }),
-          tempMax: data.daily.temperature_2m_max[i],
-          tempMin: data.daily.temperature_2m_min[i],
-          precip: data.daily.precipitation_probability_max[i],
-          wind: data.daily.wind_speed_10m_max[i],
-          uv: data.daily.uv_index_max[i],
-        }));
+        );
         setForecastData(formatted);
       }
     } catch (err) {

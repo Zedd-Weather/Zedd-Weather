@@ -20,17 +20,16 @@ logger = logging.getLogger("ZeddOrchestrator")
 # Initialize thread-safe queue for non-blocking MQTT ingestion
 telemetry_queue = queue.Queue()
 
-def fetch_meteomatics_forecast(lat: float, lon: float) -> dict:
+def fetch_accuweather_forecast(lat: float, lon: float) -> dict:
     """
-    Fetch a 5-day macro-meteorological forecast from the Meteomatics API.
-    Returns a summary dict; falls back to an empty result when credentials
-    are not configured or the API is unreachable.
+    Fetch a 5-day macro-meteorological forecast from the AccuWeather API.
+    Returns a summary dict; falls back to an empty result when the API key
+    is not configured or the API is unreachable.
     """
-    user = os.getenv("METEOMATICS_USER")
-    password = os.getenv("METEOMATICS_PASS")
-    
-    if not user or not password:
-        logger.warning("Meteomatics credentials missing (METEOMATICS_USER / METEOMATICS_PASS). Forecast unavailable.")
+    api_key = os.getenv("ACCUWEATHER_API_KEY")
+
+    if not api_key:
+        logger.warning("AccuWeather API key missing (ACCUWEATHER_API_KEY). Forecast unavailable.")
         return {
             "forecast_days": 0,
             "avg_temp_c": None,
@@ -40,40 +39,83 @@ def fetch_meteomatics_forecast(lat: float, lon: float) -> dict:
             "source": "unavailable",
         }
 
-    base_url = os.getenv("METEOMATICS_URL", "https://api.meteomatics.com")
-    from datetime import datetime as _dt, timezone as _tz
-    now = _dt.now(_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    url = f"{base_url}/{now}P5D:PT1H/t_2m:C,wind_speed_10m:ms/{lat},{lon}/json"
+    base_url = os.getenv("ACCUWEATHER_URL", "https://dataservice.accuweather.com")
+    # Conversion factor: km/h → m/s
+    kmh_to_ms = 3.6
 
     try:
         import requests  # type: ignore
-        resp = requests.get(url, auth=(user, password), timeout=15)
+
+        # Step 1: Resolve lat/lon to an AccuWeather location key
+        geo_url = (
+            f"{base_url}/locations/v1/cities/geoposition/search"
+            f"?apikey={api_key}&q={lat},{lon}"
+        )
+        geo_resp = requests.get(geo_url, timeout=15)
+        geo_resp.raise_for_status()
+        location_key = geo_resp.json().get("Key")
+        if not location_key:
+            logger.warning("AccuWeather geoposition lookup returned no location key.")
+            return {
+                "forecast_days": 0,
+                "avg_temp_c": None,
+                "max_wind_speed_ms": None,
+                "precip_probability_pct": None,
+                "severe_weather_alerts": [],
+                "source": "error",
+            }
+
+        # Step 2: Fetch 5-day daily forecast
+        forecast_url = (
+            f"{base_url}/forecasts/v1/daily/5day/{location_key}"
+            f"?apikey={api_key}&details=true&metric=true"
+        )
+        resp = requests.get(forecast_url, timeout=15)
         resp.raise_for_status()
         data = resp.json()
 
-        # Extract summary metrics from the Meteomatics response
-        temps = []
-        winds = []
-        for param in data.get("data", []):
-            for coord in param.get("coordinates", []):
-                for date_entry in coord.get("dates", []):
-                    val = date_entry.get("value")
-                    if val is not None:
-                        if "t_2m" in param.get("parameter", ""):
-                            temps.append(val)
-                        elif "wind_speed" in param.get("parameter", ""):
-                            winds.append(val)
+        # Extract summary metrics from AccuWeather response
+        temps: list[float] = []
+        winds: list[float] = []
+        precip_probs: list[int] = []
+        alerts: list[str] = []
+
+        for day in data.get("DailyForecasts", []):
+            temp_obj = day.get("Temperature", {})
+            min_temp = temp_obj.get("Minimum", {}).get("Value")
+            max_temp = temp_obj.get("Maximum", {}).get("Value")
+            if min_temp is not None:
+                temps.append(min_temp)
+            if max_temp is not None:
+                temps.append(max_temp)
+
+            # Wind speed (AccuWeather returns km/h, convert to m/s)
+            day_detail = day.get("Day", {})
+            wind_obj = day_detail.get("Wind", {}).get("Speed", {})
+            wind_kmh = wind_obj.get("Value")
+            if wind_kmh is not None:
+                winds.append(wind_kmh / kmh_to_ms)  # km/h → m/s
+
+            # Precipitation probability
+            precip_prob = day_detail.get("PrecipitationProbability")
+            if precip_prob is not None:
+                precip_probs.append(precip_prob)
+
+        # Headline alerts
+        headline = data.get("Headline", {})
+        if headline.get("Text"):
+            alerts.append(headline["Text"])
 
         return {
             "forecast_days": 5,
             "avg_temp_c": round(sum(temps) / len(temps), 1) if temps else None,
             "max_wind_speed_ms": round(max(winds), 1) if winds else None,
-            "precip_probability_pct": None,  # not available in this Meteomatics query
-            "severe_weather_alerts": [],
-            "source": "meteomatics",
+            "precip_probability_pct": round(sum(precip_probs) / len(precip_probs)) if precip_probs else None,
+            "severe_weather_alerts": alerts,
+            "source": "accuweather",
         }
     except Exception as e:
-        logger.error(f"Meteomatics API request failed: {e}")
+        logger.error("AccuWeather API request failed: %s", e)
         return {
             "forecast_days": 0,
             "avg_temp_c": None,
@@ -101,7 +143,7 @@ def generate_mitigation_strategy(telemetry: dict, forecast: dict) -> str:
     Local Micro-Climate Telemetry (Sense HAT):
     {json.dumps(telemetry, indent=2)}
     
-    Macro-Meteorological Forecast (5-Day):
+    Macro-Meteorological Forecast (5-Day via AccuWeather):
     {json.dumps(forecast, indent=2)}
     
     Output strictly the mitigation directives.
@@ -137,9 +179,9 @@ def inference_worker():
             raw_lon = os.getenv("SITE_LONGITUDE")
             if raw_lat is None or raw_lon is None:
                 logger.warning("Site coordinates not configured. Set SITE_LATITUDE and SITE_LONGITUDE env vars.")
-                forecast = fetch_meteomatics_forecast(lat=0, lon=0)
+                forecast = fetch_accuweather_forecast(lat=0, lon=0)
             else:
-                forecast = fetch_meteomatics_forecast(lat=float(raw_lat), lon=float(raw_lon))
+                forecast = fetch_accuweather_forecast(lat=float(raw_lat), lon=float(raw_lon))
             
             # 2. Edge AI Inference
             strategy = generate_mitigation_strategy(telemetry=payload, forecast=forecast)

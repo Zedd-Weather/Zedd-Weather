@@ -1,6 +1,6 @@
 """
 Node 2: Inference & Orchestration
-Subscribes to Node 1, ingests Meteomatics data, runs inference, and attests data.
+Subscribes to Node 1, ingests AccuWeather data, runs inference, and attests data.
 """
 import asyncio
 import json
@@ -17,9 +17,10 @@ MQTT_BROKER = os.environ.get("MQTT_BROKER_HOST", "127.0.0.1")
 MQTT_PORT = int(os.environ.get("MQTT_BROKER_PORT", "1883"))
 MQTT_TOPIC = "zedd/telemetry/node1"
 
-METEOMATICS_USER = os.environ.get("METEOMATICS_USER", "")
-METEOMATICS_PASS = os.environ.get("METEOMATICS_PASS", "")
-METEOMATICS_URL = os.environ.get("METEOMATICS_URL", "https://api.meteomatics.com")
+ACCUWEATHER_API_KEY = os.environ.get("ACCUWEATHER_API_KEY", "")
+ACCUWEATHER_URL = os.environ.get(
+    "ACCUWEATHER_URL", "https://dataservice.accuweather.com"
+)
 
 # Site coordinates – override with SITE_LATITUDE / SITE_LONGITUDE env vars
 _raw_lat = os.environ.get("SITE_LATITUDE")
@@ -61,34 +62,58 @@ class ZeddOrchestrator:
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             logging.error("Invalid payload received: %s", exc)
 
+    async def _resolve_location_key(self, lat: float, lon: float) -> str | None:
+        """Resolve a lat/lon pair to an AccuWeather location key."""
+        url = (
+            f"{ACCUWEATHER_URL}/locations/v1/cities/geoposition/search"
+            f"?apikey={ACCUWEATHER_API_KEY}&q={lat},{lon}"
+        )
+        try:
+            async with self.session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data.get("Key")
+                body = await resp.text()
+                logging.warning("AccuWeather location lookup returned %s: %s", resp.status, body[:200])
+                return None
+        except Exception as exc:
+            logging.error("AccuWeather location lookup failed: %s", exc)
+            return None
+
     async def fetch_macro_forecast(self):
-        """Ingests 5-day macro-meteorological forecasts via Meteomatics API."""
-        if not METEOMATICS_USER or not METEOMATICS_PASS:
-            logging.warning("Meteomatics credentials not configured. Set METEOMATICS_USER and METEOMATICS_PASS.")
+        """Ingests 5-day macro-meteorological forecasts via AccuWeather API."""
+        if not ACCUWEATHER_API_KEY:
+            logging.warning("AccuWeather API key not configured. Set ACCUWEATHER_API_KEY.")
             return None
 
         if SITE_LAT is None or SITE_LON is None:
             logging.warning("Site coordinates not configured. Set SITE_LATITUDE and SITE_LONGITUDE.")
             return None
 
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        url = f"{METEOMATICS_URL}/{now}P5D:PT1H/t_2m:C,wind_speed_10m:ms/{SITE_LAT},{SITE_LON}/json"
-        
+        location_key = await self._resolve_location_key(SITE_LAT, SITE_LON)
+        if not location_key:
+            return None
+
+        url = (
+            f"{ACCUWEATHER_URL}/forecasts/v1/daily/5day/{location_key}"
+            f"?apikey={ACCUWEATHER_API_KEY}&details=true&metric=true"
+        )
+
         try:
-            async with self.session.get(url, auth=aiohttp.BasicAuth(METEOMATICS_USER, METEOMATICS_PASS)) as resp:
+            async with self.session.get(url) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    if not isinstance(data, dict) or "data" not in data:
-                        logging.warning("Meteomatics response missing expected 'data' field.")
+                    if not isinstance(data, dict) or "DailyForecasts" not in data:
+                        logging.warning("AccuWeather response missing expected 'DailyForecasts' field.")
                         return None
-                    logging.info("Successfully ingested Meteomatics macro forecast.")
+                    logging.info("Successfully ingested AccuWeather macro forecast.")
                     return data
                 else:
                     body = await resp.text()
-                    logging.warning(f"Meteomatics API returned status {resp.status}: {body[:200]}")
+                    logging.warning("AccuWeather API returned status %s: %s", resp.status, body[:200])
                     return None
         except Exception as e:
-            logging.error(f"Failed to fetch macro forecast: {e}")
+            logging.error("Failed to fetch macro forecast: %s", e)
             return None
 
     def run_inference(self, micro_data, macro_data):

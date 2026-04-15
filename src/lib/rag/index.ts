@@ -14,16 +14,15 @@ export type {
 } from './DocumentIngestor';
 
 export {
-  DEFAULT_METEOMATICS_CONFIG,
-  METEOMATICS_PARAMETERS,
+  DEFAULT_ACCUWEATHER_CONFIG,
   HAZARD_THRESHOLDS,
-  buildMeteomaticsUrl,
-  buildAuthHeader,
-  fetchMeteomaticsWeather,
+  resolveLocationKey,
+  buildCurrentConditionsUrl,
+  fetchAccuWeatherData,
   deriveHazardFlags,
-} from './meteomatics.config';
+} from './accuweather.config';
 export type {
-  MeteomaticsConfig,
-  MeteomaticsWeatherData,
-  MeteomaticsHazardFlags,
-} from './meteomatics.config';
+  AccuWeatherConfig,
+  AccuWeatherData,
+  WeatherHazardFlags,
+} from './accuweather.config';
