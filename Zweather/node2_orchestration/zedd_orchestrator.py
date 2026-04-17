@@ -4,6 +4,7 @@ import time
 import queue
 import logging
 import hashlib
+import hmac
 import threading
 from datetime import datetime, timezone
 from dotenv import load_dotenv
@@ -197,18 +198,16 @@ def inference_worker():
             # Convert to stable JSON string (sort_keys=True, no spaces)
             stable_json = json.dumps(attestation_payload, sort_keys=True, separators=(',', ':'))
             
-            # Generate keyed BLAKE2b signature for attestation integrity
+            # Generate HMAC-SHA256 signature for attestation integrity
             signing_key = os.getenv("ATTESTATION_HMAC_KEY", "")
             if not signing_key:
                 logger.warning("ATTESTATION_HMAC_KEY not set; skipping attestation signing.")
                 attestation_payload["signature"] = None
             else:
-                # BLAKE2b supports keys up to 64 bytes
-                key_bytes = signing_key.encode('utf-8')[:64]
-                signature = hashlib.blake2b(
+                signature = hmac.new(
+                    signing_key.encode('utf-8'),
                     stable_json.encode('utf-8'),
-                    key=key_bytes,
-                    digest_size=32,
+                    hashlib.sha256,
                 ).hexdigest()
                 attestation_payload["signature"] = signature
             
