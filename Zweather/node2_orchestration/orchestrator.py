@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import hashlib
+import hmac
 import os
 from datetime import datetime, timezone
 import paho.mqtt.client as mqtt
@@ -168,16 +169,27 @@ class ZeddOrchestrator:
 
     def attest_directive(self, directive_payload):
         """Cryptographically signs the directive for the decentralized ledger."""
-        payload_str = json.dumps(directive_payload, sort_keys=True)
-        sha256_hash = hashlib.sha256(payload_str.encode('utf-8')).hexdigest()
-        
+        payload_str = json.dumps(directive_payload, sort_keys=True, separators=(',', ':'))
+
+        signing_key = os.environ.get("ATTESTATION_HMAC_KEY", "")
+        if not signing_key:
+            logging.warning("ATTESTATION_HMAC_KEY not set; skipping attestation signing.")
+            signature = None
+        else:
+            signature = hmac.new(
+                signing_key.encode('utf-8'),
+                payload_str.encode('utf-8'),
+                hashlib.sha256,
+            ).hexdigest()
+
         attestation_record = {
             "payload": directive_payload,
-            "signature": sha256_hash,
+            "signature": signature,
             "protocol": "Minima-Zedd-v1"
         }
-        logging.info(f"Attestation generated: {sha256_hash}")
-        # In production, submit `sha256_hash` to Minima RPC here
+        if signature:
+            logging.info(f"Attestation generated: {signature}")
+        # In production, submit attestation to Minima RPC here
         return attestation_record
 
     async def orchestration_loop(self):
