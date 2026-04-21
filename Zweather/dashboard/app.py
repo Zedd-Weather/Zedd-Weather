@@ -2,7 +2,7 @@
 Zedd Weather — Python Dash Dashboard
 
 A full Python frontend that replaces the React/TypeScript UI.  All external
-API calls (Google Weather API, Gemini AI) are made server-side through the
+API calls (Google Weather API, local Ollama/Gemma AI) are made server-side through the
 FastAPI backend, so no API keys are ever sent to the browser.
 
 Architecture
@@ -15,7 +15,7 @@ Architecture
       ↕  (HTTP / JSON)
     FastAPI backend  (Zweather/api.py, port 8000)
       ↕
-    Google Weather API · Gemini AI · Sensor nodes (MQTT → /api/telemetry/ingest)
+    Google Weather API · Ollama/Gemma AI · Sensor nodes (MQTT → /api/telemetry/ingest)
 
 Usage
 -----
@@ -758,7 +758,10 @@ def _auto_analyze(n: int, store: dict[str, Any] | None, sector: str | None) -> t
         {"telemetry": {**t, "uvIndex": t.get("uvIndex", 0)}, "sector": sector or "construction"},
     )
     if not result:
-        result = {"riskLevel": "Amber", "report": "AI analysis unavailable. Check GEMINI_API_KEY."}
+        result = {
+            "riskLevel": "Amber",
+            "report": "AI analysis unavailable. Check OLLAMA_BASE_URL and OLLAMA_MODEL.",
+        }
 
     level = result.get("riskLevel", "Amber")
     report = result.get("report", "")
@@ -1044,7 +1047,13 @@ def _fetch_map(
     loc = location or {"lat": DEFAULT_LAT, "lng": DEFAULT_LNG}
     result = _api_post("/api/ai/sitemap", {"lat": loc["lat"], "lng": loc["lng"]})
     if not result:
-        return html.P("Map data unavailable. Check GEMINI_API_KEY.", style={"color": C["amber"]}), ""
+        return (
+            html.P(
+                "Map data unavailable. Check OLLAMA_BASE_URL and OLLAMA_MODEL.",
+                style={"color": C["amber"]},
+            ),
+            "",
+        )
 
     report = result.get("report", "")
     links: list[dict[str, str]] = result.get("links", [])

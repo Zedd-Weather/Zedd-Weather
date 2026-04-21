@@ -22,7 +22,8 @@ It runs as a **PiNet DApp** on a Raspberry Pi Weather Node cluster with real har
 - **Sector-specific risk analysis** — construction, agricultural, and industrial heuristic engines
 - **Configurable alert system** — rule-based alerts with severity levels and threshold tuning
 - Live telemetry ingestion and visualization
-- AI-assisted mitigation guidance (NPU → Ollama → Gemini fallback chain)
+- AI-assisted mitigation guidance (NPU → Ollama/Gemma local inference)
+- Local developer workflow support with Copilot CLI (non-cloud AI setup)
 - InfluxDB time-series storage
 - Grafana dashboards
 - Open WebUI integration
@@ -51,13 +52,13 @@ It runs as a **PiNet DApp** on a Raspberry Pi Weather Node cluster with real har
 │   │   └── app.py                 #     Dash app: 4 tabs, Plotly charts, all callbacks
 │   ├── node1_telemetry/           #   Sensor drivers, MQTT publisher, config
 │   ├── node2_orchestration/       #   MQTT subscriber, AI inference, attestation
-│   ├── ollama_inference/          #   Gemini / Ollama / Hailo NPU inference clients
+│   ├── ollama_inference/          #   Ollama / Gemma / Hailo NPU inference clients
 │   ├── construction/              #   Construction sector risk engine
 │   ├── agricultural/              #   Agricultural sector risk engine (+ forecasting)
 │   ├── industrial/                #   Industrial sector risk engine
 │   ├── alerting/                  #   Rule-based alert engine + notification channels
 │   ├── weather_client.py          #   ★ Server-side Google Weather API async client
-│   ├── ai_client.py               #   ★ Server-side Gemini AI client (risk, forecast, map)
+│   ├── ai_client.py               #   ★ Server-side Ollama/Gemma AI client (risk, forecast, map)
 │   ├── api.py                     #   FastAPI REST API (extended with weather/AI/telemetry endpoints)
 │   ├── app.py                     #   Edge collector entry point
 │   └── tests/                     #   Pytest test suite
@@ -80,7 +81,7 @@ Sensors (Sense HAT / Enviro+ / Modbus)
 Node1 telemetry publisher  →  POST /api/telemetry/ingest  →  FastAPI (port 8000)
                                                                     │
 Google Weather API  ←── GET /api/weather/{current,forecast,history} ┤
-Gemini AI           ←── POST /api/ai/{risk,forecast,sitemap}        │
+Ollama (Gemma)      ←── POST /api/ai/{risk,forecast,sitemap}        │
                                                                     │
                                       Dash frontend (port 8050) ◄──┘
                                            │ browser
@@ -88,7 +89,7 @@ Gemini AI           ←── POST /api/ai/{risk,forecast,sitemap}        │
 ```
 
 **Key benefits:**
-- All API keys (`GEMINI_API_KEY`, `GOOGLE_WEATHER_API_KEY`) stay server-side — never sent to the browser
+- All API keys (`GOOGLE_WEATHER_API_KEY`) stay server-side — never sent to the browser
 - Sensor nodes push readings to `/api/telemetry/ingest` over HTTP; the Dash UI polls `/api/telemetry/latest`
 - Pure Python stack: easier deployment on Raspberry Pi, no Node.js required for the frontend
 - Plotly charts in Dash provide equivalent visualisation to the React/Recharts UI
@@ -108,7 +109,7 @@ cp .env.example .env
 
 Set at minimum:
 - `INFLUXDB_TOKEN`
-- `GEMINI_API_KEY` (optional for non-AI smoke testing)
+- `OLLAMA_BASE_URL` (required for AI features)
 
 ### 3) Start control plane + storage node workloads
 
@@ -129,7 +130,7 @@ docker compose -f docker-compose.yml -f docker-compose.cluster.yml up -d
 
 This starts:
 - `mqtt-broker` (Mosquitto on port 1883)
-- `zedd-ai-worker` (Node B – subscribes to MQTT, runs Gemini AI inference)
+- `zedd-ai-worker` (Node B – subscribes to MQTT, runs local Ollama/Gemma AI inference)
 - `zedd-sensory-worker` (Node C – publishes simulated telemetry over MQTT)
 
 Use `--build` only after local code or Dockerfile changes:
@@ -157,7 +158,8 @@ The Dash dashboard runs on **http://localhost:8050**.
 Set these environment variables before starting:
 ```
 GOOGLE_WEATHER_API_KEY=...   # Google Weather API key (server-side)
-GEMINI_API_KEY=...           # Gemini API key (server-side)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=gemma2:2b
 API_BASE_URL=http://localhost:8000
 ```
 
@@ -282,13 +284,13 @@ The FastAPI backend (`Zweather/api.py`) exposes these endpoints:
 | `GET` | `/api/weather/forecast?lat=…&lng=…&days=7` | Multi-day daily forecast |
 | `GET` | `/api/weather/history?lat=…&lng=…&days=7` | Historical hourly data |
 
-### Gemini AI (server-side key)
+### Local Ollama/Gemma AI (server-side)
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `POST` | `/api/ai/risk` | AI risk analysis on live telemetry for a sector |
 | `POST` | `/api/ai/forecast` | AI risk analysis on a 7-day forecast |
-| `POST` | `/api/ai/sitemap` | Site logistics report via Gemini + Google Maps |
+| `POST` | `/api/ai/sitemap` | Site logistics report via local Ollama/Gemma |
 
 Start the API server locally:
 

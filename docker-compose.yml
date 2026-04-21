@@ -105,7 +105,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      GEMINI_API_KEY:         ${GEMINI_API_KEY:?Set GEMINI_API_KEY in .env}
+      OLLAMA_BASE_URL:        ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL:           ${OLLAMA_MODEL:-gemma2:2b}
       GOOGLE_WEATHER_API_KEY: ${GOOGLE_WEATHER_API_KEY:-}
       INFLUXDB_URL:    http://influxdb:8086
       INFLUXDB_ORG:    ${DOCKER_INFLUXDB_INIT_ORG:-zedd-weather}

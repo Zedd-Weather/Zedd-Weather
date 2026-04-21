@@ -129,7 +129,7 @@ class TestWeatherProxy:
 
 
 # ---------------------------------------------------------------------------
-# AI endpoints (mocked — no real Gemini key in tests)
+# AI endpoints (mocked — no real local model call in tests)
 # ---------------------------------------------------------------------------
 
 _MOCK_RISK = {"riskLevel": "Amber", "report": "## Risk Report\nModerate risk detected.", "timestamp": "2025-01-01T00:00:00+00:00"}
