@@ -49,9 +49,9 @@ services:
     environment:
       MQTT_BROKER_HOST: ${MQTT_BROKER_HOST:-mqtt-broker}
       MQTT_BROKER_PORT: ${MQTT_BROKER_PORT:-1883}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       AI_HAT_ENABLED: "${AI_HAT_ENABLED:-true}"
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://10.0.0.20:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma2:2b}
     devices:
       - /dev/hailo0:/dev/hailo0
     volumes:

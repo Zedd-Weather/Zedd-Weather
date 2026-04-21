@@ -28,10 +28,10 @@ We aim to acknowledge reports within **48 hours** and provide an initial assessm
 
 ### Secrets and Credential Management
 
-- Never hardcode API keys (`GEMINI_API_KEY`, `INFLUXDB_TOKEN`, `ACCUWEATHER_API_KEY`, `VITE_GOOGLE_WEATHER_API_KEY`) or any other secrets in source code.
+- Never hardcode API keys (`INFLUXDB_TOKEN`, `ACCUWEATHER_API_KEY`, `VITE_GOOGLE_WEATHER_API_KEY`) or any other secrets in source code.
 - Store all secrets in the `.env` file and restrict its permissions: `chmod 600 .env`.
 - The `.gitignore` excludes `.env*` files (except `.env.example` and `.env.production.example`) to prevent accidental commits.
-- The Gemini API key is passed via the `x-goog-api-key` HTTP header, never as a URL query parameter.
+- Keep local AI traffic on trusted networks when using `OLLAMA_BASE_URL`; avoid exposing the Ollama port publicly.
 - Docker Compose uses the `${VAR:?msg}` syntax for mandatory secrets so that containers fail fast when secrets are missing.
 
 ### MQTT Broker Security

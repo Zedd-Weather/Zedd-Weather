@@ -9,7 +9,7 @@ import threading
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 import paho.mqtt.client as mqtt
-from google import genai
+from Zweather.ollama_inference.client import OllamaClient
 
 # Configure logging for headless edge deployment
 logging.basicConfig(
@@ -128,14 +128,11 @@ def fetch_accuweather_forecast(lat: float, lon: float) -> dict:
 
 def generate_mitigation_strategy(telemetry: dict, forecast: dict) -> str:
     """
-    Uses Gemini AI to cross-reference micro-climate telemetry with macro forecasts
+    Uses local Ollama AI to cross-reference micro-climate telemetry with macro forecasts
     to generate a concise, actionable construction site mitigation strategy.
     """
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY environment variable is not set.")
-
-    client = genai.Client(api_key=api_key)
+    model = os.getenv("OLLAMA_MODEL", "gemma2:2b")
+    client = OllamaClient()
     
     prompt = f"""
     You are a Principal Edge AI and IoT Systems Architect for Zedd Weather.
@@ -151,11 +148,8 @@ def generate_mitigation_strategy(telemetry: dict, forecast: dict) -> str:
     """
     
     try:
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=prompt
-        )
-        return response.text.strip()
+        response = client.generate(prompt=prompt, model=model)
+        return response.strip()
     except Exception as e:
         logger.error(f"AI Inference failed: {e}")
         return "ERROR: Mitigation strategy generation failed due to inference error."

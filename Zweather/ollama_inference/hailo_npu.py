@@ -2,8 +2,8 @@
 Hailo-8L NPU inference client for the Raspberry Pi AI HAT+.
 
 Provides on-device weather-pattern classification and anomaly scoring
-without cloud connectivity.  Falls back to the existing OllamaClient
-(remote LLM) or Gemini API when the NPU is unavailable.
+without cloud connectivity. Falls back to the existing OllamaClient
+when the NPU is unavailable.
 
 The client loads a pre-compiled HEF (Hailo Executable Format) model at
 startup and keeps it resident on the NPU for low-latency inference.

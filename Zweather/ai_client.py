@@ -1,22 +1,21 @@
 """
-Server-side Gemini AI client.
+Server-side local AI client (Ollama + Gemma).
 
-Provides risk analysis, forecast analysis, and site-map generation.
-All calls are made server-side so the GEMINI_API_KEY is never sent to the browser.
-
-Uses the ``google-genai`` SDK (already a backend dependency).
+Provides risk analysis, forecast analysis, and site-map generation via a local
+Ollama server for non-cloud deployments.
 """
 import json
 import logging
 import os
 from typing import Any
 
-from google import genai
-from google.genai import types as genai_types
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
-_GEMINI_MODEL = "gemini-2.0-flash"
+_DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
+_DEFAULT_MODEL = "gemma2:2b"
+_REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=45)
 
 # Mirror of the frontend SECTOR_CONFIG so we can keep this module self-contained.
 SECTOR_CONFIG: dict[str, dict[str, str]] = {
@@ -46,30 +45,52 @@ SECTOR_CONFIG: dict[str, dict[str, str]] = {
     },
 }
 
-_RISK_SCHEMA = genai_types.Schema(
-    type=genai_types.Type.OBJECT,
-    properties={
-        "riskLevel": genai_types.Schema(
-            type=genai_types.Type.STRING,
-            enum=["Green", "Amber", "Red", "Black"],
-            description=(
-                "Overall risk level. Green = low, Black = full shutdown."
-            ),
-        ),
-        "report": genai_types.Schema(
-            type=genai_types.Type.STRING,
-            description=(
-                "Detailed Markdown report with analysis and mitigation directives."
-            ),
-        ),
-    },
-    required=["riskLevel", "report"],
-)
+def _ollama_base_url() -> str:
+    return os.getenv("OLLAMA_BASE_URL", _DEFAULT_OLLAMA_URL).rstrip("/")
 
 
-def _client() -> genai.Client:
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    return genai.Client(api_key=api_key)
+def _ollama_model() -> str:
+    return os.getenv("OLLAMA_MODEL", _DEFAULT_MODEL)
+
+
+def _extract_json_object(raw_text: str) -> dict[str, Any]:
+    text = (raw_text or "").strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, dict) else {}
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or start >= end:
+            return {}
+        try:
+            parsed = json.loads(text[start:end + 1])
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+
+
+def _normalize_risk_level(level: Any) -> str:
+    allowed = {"Green", "Amber", "Red", "Black"}
+    text = str(level or "").strip().title()
+    return text if text in allowed else "Amber"
+
+
+async def _generate_text(prompt: str) -> str:
+    payload = {
+        "model": _ollama_model(),
+        "prompt": prompt,
+        "stream": False,
+        "options": {"temperature": 0.2},
+    }
+    url = f"{_ollama_base_url()}/api/generate"
+    async with aiohttp.ClientSession(timeout=_REQUEST_TIMEOUT) as session:
+        async with session.post(url, json=payload) as response:
+            response.raise_for_status()
+            data = await response.json()
+            return str(data.get("response", "")).strip()
 
 
 async def analyze_risk(
@@ -106,22 +127,15 @@ async def analyze_risk(
         f"Focus on: {cfg['focusAreas']}.\n"
         f"Provide strict mitigation directives that will be cryptographically "
         f"signed to the ledger. Do not ask for images; base your analysis "
-        f"solely on the data provided."
+        f"solely on the data provided.\n\n"
+        "Return only valid JSON with this shape:\n"
+        '{"riskLevel":"Green|Amber|Red|Black","report":"Markdown report"}'
     )
-
-    ai = _client()
-    response = await ai.aio.models.generate_content(
-        model=_GEMINI_MODEL,
-        contents=prompt,
-        config=genai_types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=_RISK_SCHEMA,
-        ),
-    )
-    data = json.loads(response.text or "{}")
+    raw = await _generate_text(prompt)
+    data = _extract_json_object(raw)
     return {
-        "riskLevel": data.get("riskLevel", "Amber"),
-        "report": data.get("report", ""),
+        "riskLevel": _normalize_risk_level(data.get("riskLevel")),
+        "report": str(data.get("report", "")).strip(),
     }
 
 
@@ -153,28 +167,21 @@ async def analyze_forecast(
         f"{cfg['description']}.\n"
         f"Focus on: {cfg['focusAreas']}.\n"
         f"Provide strict mitigation directives that will be cryptographically "
-        f"signed to the ledger."
+        f"signed to the ledger.\n\n"
+        "Return only valid JSON with this shape:\n"
+        '{"riskLevel":"Green|Amber|Red|Black","report":"Markdown report"}'
     )
-
-    ai = _client()
-    response = await ai.aio.models.generate_content(
-        model=_GEMINI_MODEL,
-        contents=prompt,
-        config=genai_types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=_RISK_SCHEMA,
-        ),
-    )
-    data = json.loads(response.text or "{}")
+    raw = await _generate_text(prompt)
+    data = _extract_json_object(raw)
     return {
-        "riskLevel": data.get("riskLevel", "Amber"),
-        "report": data.get("report", ""),
+        "riskLevel": _normalize_risk_level(data.get("riskLevel")),
+        "report": str(data.get("report", "")).strip(),
     }
 
 
 async def generate_site_map(lat: float, lng: float) -> dict[str, Any]:
     """
-    Generate a site logistics report via Gemini with Google Maps grounding.
+    Generate a site logistics report via local LLM.
 
     Parameters
     ----------
@@ -185,40 +192,16 @@ async def generate_site_map(lat: float, lng: float) -> dict[str, Any]:
     -------
     Dict with ``report`` (Markdown str) and ``links`` (list of {uri, title}).
     """
-    ai = _client()
-    response = await ai.aio.models.generate_content(
-        model=_GEMINI_MODEL,
-        contents=(
-            f"Find nearby emergency services and hardware stores near the "
-            f"coordinates {lat}, {lng}. Provide a brief logistics report."
-        ),
-        config=genai_types.GenerateContentConfig(
-            tools=[{"googleMaps": {}}],  # type: ignore[arg-type]
-            tool_config={
-                "retrievalConfig": {"latLng": {"latitude": lat, "longitude": lng}}
-            },
-        ),
+    prompt = (
+        "You are a site logistics assistant.\n"
+        f"Given coordinates latitude={lat}, longitude={lng}, create a concise "
+        "operations checklist for emergency access, hardware sourcing, and "
+        "route planning assumptions.\n"
+        "Do not invent real links. Keep output in Markdown."
     )
-
-    report: str = response.text or "Failed to fetch map data."
-    links: list[dict[str, str]] = []
-
-    candidates = getattr(response, "candidates", None) or []
-    if candidates:
-        grounding = getattr(candidates[0], "grounding_metadata", None)
-        chunks = getattr(grounding, "grounding_chunks", None) or []
-        seen: set[str] = set()
-        for chunk in chunks:
-            maps_chunk = getattr(chunk, "maps", None)
-            if maps_chunk:
-                uri = getattr(maps_chunk, "uri", "")
-                if uri and uri not in seen:
-                    seen.add(uri)
-                    links.append(
-                        {
-                            "uri": uri,
-                            "title": getattr(maps_chunk, "title", "") or "",
-                        }
-                    )
-
-    return {"report": report, "links": links}
+    try:
+        report = await _generate_text(prompt)
+    except aiohttp.ClientError as exc:
+        logger.error("Local AI site-map generation failed: %s", exc)
+        report = "Failed to generate local site logistics report."
+    return {"report": report, "links": []}

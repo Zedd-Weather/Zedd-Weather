@@ -305,7 +305,7 @@ async def weather_history(
 
 
 # ---------------------------------------------------------------------------
-# Server-side AI endpoints (Gemini)
+# Server-side AI endpoints (local Ollama / Gemma)
 # ---------------------------------------------------------------------------
 
 
@@ -334,9 +334,9 @@ class AIRiskRequest(BaseModel):
 @app.post("/api/ai/risk")
 async def ai_risk_analysis(request: AIRiskRequest):
     """
-    Run Gemini AI risk analysis on live telemetry.
+    Run local Ollama/Gemma AI risk analysis on live telemetry.
 
-    Requires ``GEMINI_API_KEY`` to be set in the environment.
+    Requires local Ollama to be reachable via ``OLLAMA_BASE_URL``.
     Returns ``{riskLevel, report, timestamp}``.
     """
     try:
@@ -367,7 +367,7 @@ class AIForecastRequest(BaseModel):
 @app.post("/api/ai/forecast")
 async def ai_forecast_analysis(request: AIForecastRequest):
     """
-    Run Gemini AI analysis on a 7-day forecast.
+    Run local Ollama/Gemma AI analysis on a 7-day forecast.
 
     Returns ``{riskLevel, report, timestamp}``.
     """
@@ -394,7 +394,7 @@ class AISiteMapRequest(BaseModel):
 @app.post("/api/ai/sitemap")
 async def ai_site_map(request: AISiteMapRequest):
     """
-    Generate a site logistics map report via Gemini + Google Maps grounding.
+    Generate a site logistics map report via local Ollama/Gemma inference.
 
     Returns ``{report, links, timestamp}``.
     """
