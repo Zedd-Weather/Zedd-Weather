@@ -207,7 +207,7 @@ def inference_worker():
                 signature = hmac.new(
                     signing_key.encode('utf-8'),
                     stable_json.encode('utf-8'),
-                    hashlib.sha512,
+                    hashlib.sha3_512,
                 ).hexdigest()
                 attestation_payload["signature"] = signature
             
