@@ -65,14 +65,15 @@ The repository contains:
 ## Hardware profile
 
 The reference deployment is a small Raspberry Pi cluster (typically
-three Pi 5 nodes), where the **sensory worker** (Node C) is fitted with
-the following hardware stack:
+three Pi 5 nodes). So far the cluster uses three HATs, one per node —
+the **Weather HAT PRO** on the sensory worker, the **AI HAT+** on the
+AI worker, and an **M.2 NVMe HAT** on the control-plane / storage node:
 
 | Component | Role |
 |---|---|
-| **BCRobotics Weather HAT PRO** | Primary sensor HAT. On-board BME280 (temperature, pressure, humidity) plus three RJ12 jacks that break out a SparkFun-style anemometer, wind vane, and tipping-bucket rain gauge. |
-| **AI HAT+ (Hailo-8L NPU)** | On-device edge AI inference via the M.2 Key E accelerator slot — runs the weather-classification model without cloud calls. |
-| **M.2 NVMe SSD** | Fast local telemetry buffer and storage for the compiled HEF model artefacts. |
+| **BCRobotics Weather HAT PRO** | Sensory worker (Node C) primary sensor HAT. On-board BME280 (temperature, pressure, humidity) plus three RJ12 jacks that break out a SparkFun-style anemometer, wind vane, and tipping-bucket rain gauge. |
+| **AI HAT+ (Hailo-8L NPU)** | AI worker (Node B) on-device edge AI inference via the M.2 Key E accelerator slot — runs the weather-classification model without cloud calls. |
+| **M.2 NVMe HAT** | Control-plane / storage node (Node A) fast local telemetry buffer and storage for the compiled HEF model artefacts. |
 | **Sense HAT v2** *(optional)* | Legacy / secondary HAT for sites that still need an IMU or the 8×8 LED matrix. Disabled by default. |
 | **Pimoroni Enviro+** *(optional)* | Air-quality add-on (BME280, LTR559, MICS6814 gas, PMS5003 PM). Off by default. |
 | **Adafruit VEML6075 UV sensor** *(optional, I²C)* | UVA / UVB irradiance and UV index. Off by default. |
@@ -88,7 +89,7 @@ mixed and matched depending on what is physically wired to the node.
 |---|---|---|
 | **Node A** | Control plane + storage worker | InfluxDB, Grafana, Open WebUI, FastAPI backend, Dash dashboard |
 | **Node B** | AI worker (Hailo-8L NPU) | Node 2 orchestration: subscribes to MQTT telemetry, runs on-device weather classification, and consults a local Ollama / Gemma model for mitigation guidance |
-| **Node C** | Sensory worker (BCRobotics Weather HAT PRO + AI HAT+) | Node 1 telemetry publisher: reads from the Weather HAT PRO and any other enabled peripherals, optionally drives the Sense HAT LED matrix and GPIO alarm outputs, and publishes to MQTT |
+| **Node C** | Sensory worker (BCRobotics Weather HAT PRO) | Node 1 telemetry publisher: reads from the Weather HAT PRO and any other enabled peripherals, optionally drives the Sense HAT LED matrix and GPIO alarm outputs, and publishes to MQTT |
 
 The cluster can also be collapsed onto a single host for development —
 see [Quick start](#quick-start).
