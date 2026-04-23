@@ -28,7 +28,7 @@ We aim to acknowledge reports within **48 hours** and provide an initial assessm
 
 ### Secrets and Credential Management
 
-- Never hardcode API keys (`INFLUXDB_TOKEN`, `ACCUWEATHER_API_KEY`, `VITE_GOOGLE_WEATHER_API_KEY`) or any other secrets in source code.
+- Never hardcode API keys (`INFLUXDB_TOKEN`, `ACCUWEATHER_API_KEY`, `GOOGLE_WEATHER_API_KEY`) or any other secrets in source code.
 - Store all secrets in the `.env` file and restrict its permissions: `chmod 600 .env`.
 - The `.gitignore` excludes `.env*` files (except `.env.example` and `.env.production.example`) to prevent accidental commits.
 - Keep local AI traffic on trusted networks when using `OLLAMA_BASE_URL`; avoid exposing the Ollama port publicly.
@@ -55,8 +55,8 @@ We aim to acknowledge reports within **48 hours** and provide an initial assessm
 ### CI / Supply Chain
 
 - GitHub Actions workflows follow least-privilege permissions (`contents: read` by default).
-- CodeQL runs weekly and on every PR for both JavaScript/TypeScript and Python.
-- Dependencies are pinned with lock files (`package-lock.json`, `requirements.txt`).
+- CodeQL runs weekly and on every PR for Python.
+- Python dependencies are pinned in `Zweather/requirements.txt`.
 
 ## Edge Node Security (Raspberry Pi 5)
 

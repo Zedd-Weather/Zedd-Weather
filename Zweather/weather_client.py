@@ -2,8 +2,7 @@
 Server-side Google Weather API client.
 
 All calls are made server-side so the API key is never exposed to the browser.
-Reads from GOOGLE_WEATHER_API_KEY, falling back to VITE_GOOGLE_WEATHER_API_KEY
-for backward compatibility with existing `.env` files.
+Reads the key from the GOOGLE_WEATHER_API_KEY environment variable.
 """
 import logging
 import os
@@ -21,10 +20,7 @@ _KMH_TO_MS_DIVISOR = 3.6  # divide km/h by this to get m/s
 
 def _api_key() -> str:
     """Return the Google Weather API key from environment variables."""
-    return (
-        os.getenv("GOOGLE_WEATHER_API_KEY")
-        or os.getenv("VITE_GOOGLE_WEATHER_API_KEY", "")
-    )
+    return os.getenv("GOOGLE_WEATHER_API_KEY", "")
 
 
 async def get_current_conditions(lat: float, lng: float) -> dict[str, Any]:

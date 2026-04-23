@@ -12,7 +12,7 @@ By participating in this project you agree to abide by our [Code of Conduct](COD
 
 - Search [existing issues](https://github.com/WilliamMajanja/Zedd-Weather/issues) before opening a new one.
 - Use the **Bug Report** issue template.
-- Include steps to reproduce, expected vs actual behaviour, and your environment (OS, Node.js version, Python version, hardware).
+- Include steps to reproduce, expected vs actual behaviour, and your environment (OS, Python version, hardware).
 
 ### Suggesting Features
 
@@ -31,24 +31,22 @@ By participating in this project you agree to abide by our [Code of Conduct](COD
 
 ### Prerequisites
 
-- Node.js 20+
 - Python 3.12+
 - Docker with Compose v2 (for full-stack testing)
 
-### Frontend
-
-```bash
-npm install
-npm run dev          # Vite dev server on http://localhost:5173
-npm run build        # Production build
-npm run lint         # TypeScript type-check (tsc --noEmit)
-```
-
-### Backend (Python)
+### Backend (FastAPI) and Frontend (Dash)
 
 ```bash
 pip install -r Zweather/requirements.txt
-pytest Zweather/tests/ -v --tb=short   # Run tests
+
+# Run the FastAPI backend
+uvicorn Zweather.api:app --host 0.0.0.0 --port 8000
+
+# Run the Dash frontend (in a second terminal)
+python -m Zweather.dashboard.app
+
+# Tests and linting
+pytest Zweather/tests/ -v --tb=short
 flake8 Zweather/ --select=E9,F63,F7,F82 --show-source --statistics
 ```
 
@@ -66,12 +64,7 @@ docker compose up -d      # Start control plane + storage services
 - Follow [PEP 8](https://peps.python.org/pep-0008/) style.
 - Use type hints where practical.
 - Run `flake8` and `mypy` before submitting.
-
-### TypeScript / React
-
-- Use TypeScript strict mode (`tsc --noEmit` must pass).
-- Place types in `src/types/`, hooks in `src/hooks/`, page components in `src/components/`.
-- Use [Tailwind CSS](https://tailwindcss.com/) for styling.
+- Place sector engines in their own package (e.g. `Zweather/construction/`), Dash UI in `Zweather/dashboard/`, and tests in `Zweather/tests/`.
 
 ### Commits
 

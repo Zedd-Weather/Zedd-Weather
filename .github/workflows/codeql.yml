@@ -23,7 +23,6 @@ jobs:
       fail-fast: false
       matrix:
         language:
-          - javascript-typescript
           - python
     steps:
       - name: Checkout repository

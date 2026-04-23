@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Zedd Weather is an edge telemetry and risk-analysis platform for industrial, agricultural, and construction monitoring.  
-This repository contains a React frontend, Python telemetry services, a FastAPI REST API, and Docker-based local deployment assets.
+This repository contains a Python Dash frontend, Python telemetry services, a FastAPI REST API, and Docker-based local deployment assets.
 
 It runs as a **PiNet DApp** on a Raspberry Pi Weather Node cluster with real hardware:
 
@@ -42,13 +42,8 @@ It runs as a **PiNet DApp** on a Raspberry Pi Weather Node cluster with real har
 
 ```text
 .
-├── src/                           # React 19 + TypeScript frontend (Vite) — legacy
-│   ├── components/                #   Page components and shared UI
-│   ├── hooks/                     #   Custom React hooks (telemetry, alerts, forecast, …)
-│   ├── types/                     #   TypeScript type definitions
-│   └── lib/                       #   RAG pipeline, evaluation metrics, utilities
 ├── Zweather/                      # Python backend + Python Dash frontend
-│   ├── dashboard/                 #   ★ Python Dash frontend (replaces React)
+│   ├── dashboard/                 #   Python Dash frontend (port 8050)
 │   │   └── app.py                 #     Dash app: 4 tabs, Plotly charts, all callbacks
 │   ├── node1_telemetry/           #   Sensor drivers, MQTT publisher, config
 │   ├── node2_orchestration/       #   MQTT subscriber, AI inference, attestation
@@ -57,9 +52,9 @@ It runs as a **PiNet DApp** on a Raspberry Pi Weather Node cluster with real har
 │   ├── agricultural/              #   Agricultural sector risk engine (+ forecasting)
 │   ├── industrial/                #   Industrial sector risk engine
 │   ├── alerting/                  #   Rule-based alert engine + notification channels
-│   ├── weather_client.py          #   ★ Server-side Google Weather API async client
-│   ├── ai_client.py               #   ★ Server-side Ollama/Gemma AI client (risk, forecast, map)
-│   ├── api.py                     #   FastAPI REST API (extended with weather/AI/telemetry endpoints)
+│   ├── weather_client.py          #   Server-side Google Weather API async client
+│   ├── ai_client.py               #   Server-side Ollama/Gemma AI client (risk, forecast, map)
+│   ├── api.py                     #   FastAPI REST API (port 8000)
 │   ├── app.py                     #   Edge collector entry point
 │   └── tests/                     #   Pytest test suite
 ├── docker-compose.yml             # Core local stack (control plane + storage)
@@ -91,15 +86,15 @@ Ollama (Gemma)      ←── POST /api/ai/{risk,forecast,sitemap}        │
 **Key benefits:**
 - All API keys (`GOOGLE_WEATHER_API_KEY`) stay server-side — never sent to the browser
 - Sensor nodes push readings to `/api/telemetry/ingest` over HTTP; the Dash UI polls `/api/telemetry/latest`
-- Pure Python stack: easier deployment on Raspberry Pi, no Node.js required for the frontend
-- Plotly charts in Dash provide equivalent visualisation to the React/Recharts UI
+- Pure Python stack: easier deployment on Raspberry Pi, no Node.js required
+- Plotly charts in Dash provide rich, interactive visualisation
 
 ## Quick Start (Local)
 
 ### 1) Prerequisites
 
 - Docker with Compose v2
-- Node.js 20+
+- Python 3.12+ (for running the API and Dash app outside containers)
 
 ### 2) Configure
 
@@ -139,9 +134,7 @@ Use `--build` only after local code or Dockerfile changes:
 docker compose -f docker-compose.yml -f docker-compose.cluster.yml up -d --build
 ```
 
-### 5) Python dashboard (recommended) and legacy React frontend
-
-**Python Dash dashboard** (no Node.js required):
+### 5) Python Dash dashboard
 
 ```bash
 pip install -r Zweather/requirements.txt
@@ -170,15 +163,6 @@ curl -X POST http://localhost:8000/api/telemetry/ingest \
   -H 'Content-Type: application/json' \
   -d '{"temperature": 25.3, "humidity": 58.0, "pressure": 1013.0, "node_id": "pi-node-c"}'
 ```
-
-**Legacy React frontend** (requires Node.js 20+):
-
-```bash
-npm install
-npm run dev
-```
-
-The Vite dev server runs on **http://localhost:5173** (separate from Grafana on port 3000).
 
 ## Three-Node Cluster Test
 
@@ -252,10 +236,8 @@ Set sensor toggles in `.env` (`SENSE_HAT_ENABLED`, `ENVIRO_PLUS_ENABLED`, etc.) 
 The GitHub Actions workflows run:
 - Python lint (flake8, mypy)
 - Python tests (pytest)
-- TypeScript type-check (`tsc --noEmit`)
-- Vite production build
 - Multi-arch Docker build (arm64 + amd64)
-- CodeQL security analysis (JavaScript/TypeScript + Python) — weekly and on every PR
+- CodeQL security analysis (Python) — weekly and on every PR
 
 ## REST API
 

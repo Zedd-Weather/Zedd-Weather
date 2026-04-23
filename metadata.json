@@ -1,5 +1,0 @@
-{
-  "name": "Zedd Weather",
-  "description": "Enterprise-grade weather automation and environmental attestation system using Minima blockchain.",
-  "requestFramePermissions": ["geolocation"]
-}

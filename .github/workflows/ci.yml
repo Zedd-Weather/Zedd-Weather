@@ -6,7 +6,6 @@ on:
       - "Zweather/**"
       - "Dockerfile"
       - ".github/workflows/ci.yml"
-      - "src/**"
   pull_request:
     branches:
       - main
@@ -82,32 +81,11 @@ jobs:
           if-no-files-found: ignore
 
   # ---------------------------------------------------------------------------
-  # TypeScript linting
-  # ---------------------------------------------------------------------------
-  lint-typescript:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "20"
-          cache: npm
-
-      - name: Install Node dependencies
-        run: npm ci
-
-      - name: TypeScript lint
-        run: npm run lint
-
-  # ---------------------------------------------------------------------------
   # Docker build
   # ---------------------------------------------------------------------------
   build-docker:
     runs-on: ubuntu-latest
-    needs: [lint-python, lint-typescript]
+    needs: [lint-python]
     permissions:
       contents: read
       packages: write

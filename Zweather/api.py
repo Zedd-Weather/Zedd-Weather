@@ -33,8 +33,8 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Allow the Dash frontend (dev server on :8050 or production) and the React
-# legacy frontend (dev server on :5173)
+# Allow the Dash frontend (dev server on :8050 or production deployments)
+# to call the API from a browser.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

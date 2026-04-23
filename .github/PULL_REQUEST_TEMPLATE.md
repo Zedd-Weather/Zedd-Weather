@@ -18,7 +18,7 @@
 
 - [ ] My code follows the project coding standards
 - [ ] I have added tests that prove my fix or feature works
-- [ ] All existing tests pass (`pytest Zweather/tests/ -v`, `npm run build`)
+- [ ] All existing tests pass (`pytest Zweather/tests/ -v`)
 - [ ] I have updated documentation where necessary
 - [ ] I have checked that no secrets or credentials are committed
 

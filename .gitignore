@@ -1,4 +1,3 @@
-node_modules/
 build/
 dist/
 coverage/
@@ -9,3 +8,5 @@ coverage/
 !.env.production.example
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/

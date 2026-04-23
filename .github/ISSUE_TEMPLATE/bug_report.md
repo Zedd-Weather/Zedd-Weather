@@ -28,7 +28,6 @@ What actually happened. Include any error messages or log output.
 
 - **OS**: (e.g. Raspberry Pi OS Bookworm, Ubuntu 24.04)
 - **Hardware**: (e.g. Raspberry Pi 5, Sense HAT v2, AI HAT+)
-- **Node.js version**: (e.g. 20.x)
 - **Python version**: (e.g. 3.12)
 - **Docker version**: (if applicable)
 - **Browser**: (if frontend issue)

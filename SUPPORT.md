@@ -19,7 +19,7 @@ If you need help with Zedd Weather, here are the best ways to get support:
 ### Before Opening an Issue
 
 1. Search existing [issues](https://github.com/WilliamMajanja/Zedd-Weather/issues) and [discussions](https://github.com/WilliamMajanja/Zedd-Weather/discussions) to see if your question has already been answered.
-2. Include your environment details: OS, Node.js version, Python version, Docker version, and hardware (e.g. Raspberry Pi model, attached HATs).
+2. Include your environment details: OS, Python version, Docker version, and hardware (e.g. Raspberry Pi model, attached HATs).
 3. For bugs, include steps to reproduce and relevant log output.
 
 ### Security Issues

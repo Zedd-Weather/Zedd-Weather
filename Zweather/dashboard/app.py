@@ -1,8 +1,8 @@
 """
 Zedd Weather — Python Dash Dashboard
 
-A full Python frontend that replaces the React/TypeScript UI.  All external
-API calls (Google Weather API, local Ollama/Gemma AI) are made server-side through the
+The official Python frontend for Zedd Weather.  All external API calls
+(Google Weather API, local Ollama/Gemma AI) are made server-side through the
 FastAPI backend, so no API keys are ever sent to the browser.
 
 Architecture
@@ -55,7 +55,7 @@ DEFAULT_LAT = 37.7749
 DEFAULT_LNG = -122.4194
 
 # ---------------------------------------------------------------------------
-# Colour palette (mirrors the React dark theme)
+# Colour palette
 # ---------------------------------------------------------------------------
 C = {
     "bg": "#0a0a0a",
