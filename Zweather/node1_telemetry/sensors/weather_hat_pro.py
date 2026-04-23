@@ -41,9 +41,24 @@ logger = logging.getLogger(__name__)
 # (= 0.6667 m/s) wind speed at the cup centre.
 _ANEMOMETER_MS_PER_HZ = 0.6667
 
+# Reed-switch debounce times (in milliseconds, passed to
+# ``RPi.GPIO.add_event_detect``).  The anemometer pulses several times
+# per second in strong winds, so we use a short 10 ms debounce; the
+# rain-gauge bucket physically takes ~200 ms to tip and re-arm, hence
+# the much longer 300 ms guard time.
+_ANEMOMETER_DEBOUNCE_MS = 10
+_RAIN_GAUGE_DEBOUNCE_MS = 300
+
+# Maximum allowed delta (Volts) between a measured wind-vane voltage
+# and a known calibration point in ``_VANE_LOOKUP``.  Readings further
+# away than this are treated as a wiring fault and the bearing is
+# omitted from the payload (instead of returning a misleading value).
+_VANE_VOLTAGE_TOLERANCE_V = 0.30
+
 # Wind-vane resistor-divider voltages (Volts, 5 V supply) → bearing in
 # degrees.  Values are taken from the SparkFun weather meter datasheet
-# and are accurate to ±5°.  We tolerate ±0.15 V when matching.
+# and are accurate to ±5°.  Readings within ``_VANE_VOLTAGE_TOLERANCE_V``
+# of an entry are matched to that bearing.
 _VANE_LOOKUP = [
     (3.84, 0.0),    (1.98, 22.5),  (2.25, 45.0),  (0.41, 67.5),
     (0.45, 90.0),   (0.32, 112.5), (0.90, 135.0), (0.62, 157.5),
@@ -118,13 +133,13 @@ class WeatherHatProDriver(BaseSensor):
                 config.WEATHER_HAT_PRO_ANEMOMETER_GPIO_PIN,
                 GPIO.FALLING,
                 callback=self._on_anemometer_pulse,
-                bouncetime=10,
+                bouncetime=_ANEMOMETER_DEBOUNCE_MS,
             )
             GPIO.add_event_detect(
                 config.WEATHER_HAT_PRO_RAIN_GAUGE_GPIO_PIN,
                 GPIO.FALLING,
                 callback=self._on_rain_pulse,
-                bouncetime=300,
+                bouncetime=_RAIN_GAUGE_DEBOUNCE_MS,
             )
             any_ok = True
             logger.info(
@@ -235,7 +250,7 @@ class WeatherHatProDriver(BaseSensor):
                 best_bearing = bearing
         # Reject readings that are far from any expected resistor value
         # (likely a disconnected vane or wiring fault).
-        if best_delta > 0.30:
+        if best_delta > _VANE_VOLTAGE_TOLERANCE_V:
             return None
         return best_bearing
 
