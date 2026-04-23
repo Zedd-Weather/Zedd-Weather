@@ -73,6 +73,20 @@ UV_SENSOR_I2C_ADDR = int(os.getenv("UV_SENSOR_I2C_ADDR", "0x10"), 0)
 ENVIRO_PLUS_ENABLED = os.getenv("ENVIRO_PLUS_ENABLED", "false").lower() == "true"
 
 # ---------------------------------------------------------------------------
+# Pimoroni Weather HAT (BME280 + LTR559 + wind/rain + 1.54" LCD)
+# ---------------------------------------------------------------------------
+WEATHER_HAT_ENABLED = os.getenv("WEATHER_HAT_ENABLED", "false").lower() == "true"
+# CPU temperature compensation factor for the BME280 on the Weather HAT
+# (the board sits close to the Pi CPU).  Pimoroni's reference example uses 0.8.
+WEATHER_HAT_TEMP_OFFSET = float(os.getenv("WEATHER_HAT_TEMP_OFFSET", "0.8"))
+# Integration window (seconds) used when calling WeatherHAT.update() — wind
+# speed and rainfall are accumulated over this window.  Typically matches
+# PUBLISH_INTERVAL.
+WEATHER_HAT_UPDATE_INTERVAL = float(
+    os.getenv("WEATHER_HAT_UPDATE_INTERVAL", str(PUBLISH_INTERVAL))
+)
+
+# ---------------------------------------------------------------------------
 # Modbus / RS485 – Industrial Sensors (via Waveshare RS485 CAN HAT)
 # ---------------------------------------------------------------------------
 MODBUS_ENABLED = os.getenv("MODBUS_ENABLED", "false").lower() == "true"

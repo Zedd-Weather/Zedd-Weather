@@ -24,6 +24,9 @@ pimoroni-bme280>=1.0.0; platform_machine == "aarch64" or platform_machine == "ar
 pimoroni-ltr559>=1.0.0; platform_machine == "aarch64" or platform_machine == "armv7l"
 pms5003>=1.0.0; platform_machine == "aarch64" or platform_machine == "armv7l"
 
+# Pimoroni Weather HAT (BME280 + LTR559 + wind/rain + 1.54" LCD)
+weatherhat>=0.0.3; platform_machine == "aarch64" or platform_machine == "armv7l"
+
 # Modbus / RS485 industrial sensors
 pymodbus>=3.6.0
 pyserial>=3.5

@@ -18,6 +18,7 @@ from Zweather.node1_telemetry.sensors.ai_hat_driver import AIHatDriver
 from Zweather.node1_telemetry.sensors.gpio_sensors import RainGaugeSensor
 from Zweather.node1_telemetry.sensors.uv_sensor import UVSensor
 from Zweather.node1_telemetry.sensors.enviro_plus import EnviroPlusSensor
+from Zweather.node1_telemetry.sensors.weather_hat import WeatherHatSensor
 from Zweather.node1_telemetry.sensors.modbus_sensors import ModbusSensors
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,10 @@ class SensorManager:
         enviro = EnviroPlusSensor()
         enviro.initialize()
         self._drivers.append(enviro)
+
+        weather_hat = WeatherHatSensor()
+        weather_hat.initialize()
+        self._drivers.append(weather_hat)
 
         modbus = ModbusSensors()
         modbus.initialize()
