@@ -9,6 +9,9 @@ If you need help with Zedd Weather, here are the best ways to get support:
 - **[README](README.md)** — Quick start, architecture overview, and environment variables.
 - **[CONTRIBUTING](CONTRIBUTING.md)** — Development setup and coding standards.
 - **[SECURITY](SECURITY.md)** — Security policy and edge node hardening guidance.
+- **[PRIVACY](PRIVACY.md)** — Telemetry, retention, and external data-flow guidance.
+- **[GOVERNANCE](GOVERNANCE.md)** — Maintainer roles and decision process.
+- **[RELEASE_POLICY](RELEASE_POLICY.md)** — Versioning, releases, and support expectations.
 
 ### Issues
 

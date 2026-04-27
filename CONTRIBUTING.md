@@ -75,6 +75,15 @@ docker compose up -d      # Start control plane + storage services
 
 If you have access to a Raspberry Pi 5 with a Sense HAT v2 or AI HAT+, please test hardware-specific changes on real hardware before submitting. Set sensor toggles in `.env` to match your hardware configuration.
 
+## Project Policies
+
+Please review the project policies before contributing substantial changes:
+
+- [Security Policy](SECURITY.md) — responsible disclosure and hardening expectations.
+- [Privacy Policy](PRIVACY.md) — telemetry, retention, and external data-flow guidance.
+- [Governance Policy](GOVERNANCE.md) — maintainer roles, decisions, and escalation.
+- [Release Policy](RELEASE_POLICY.md) — versioning, release readiness, and support expectations.
+
 ## Security Vulnerabilities
 
 **Do not** report security vulnerabilities through public issues. See [SECURITY.md](SECURITY.md) for responsible disclosure instructions.

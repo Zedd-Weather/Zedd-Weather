@@ -20,6 +20,7 @@
 - [ ] I have added tests that prove my fix or feature works
 - [ ] All existing tests pass (`pytest Zweather/tests/ -v`)
 - [ ] I have updated documentation where necessary
+- [ ] I have reviewed policy impacts (security, privacy, governance, release) where applicable
 - [ ] I have checked that no secrets or credentials are committed
 
 ## Screenshots / Logs
