@@ -225,7 +225,10 @@ class SovereignWeatherEngine:
         if previous is None:
             return TransitionPhase.DATA_ENTRY
         if previous.phase == TransitionPhase.SETTLEMENT:
-            raise ValueError("Cannot advance beyond settlement; issue a new root weather coin")
+            raise ValueError(
+                "Cannot advance beyond settlement phase. Create a new root weather coin "
+                "with compose_transition and no previous_state."
+            )
         next_index = self._phase_index(previous.phase) + 1
         return TransitionPhase(PHASE_ORDER[next_index])
 

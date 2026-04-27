@@ -213,4 +213,6 @@ class TestSovereignProtocolAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is False
-        assert any("ASSERT PROOF" in trace["message"] for trace in data["traces"] if not trace["valid"])
+        invalid_traces = [trace for trace in data["traces"] if not trace["valid"]]
+        assert invalid_traces
+        assert any("ASSERT PROOF" in trace["message"] for trace in invalid_traces)
