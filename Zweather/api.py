@@ -24,6 +24,15 @@ from Zweather.construction.engine import ConstructionEngine
 from Zweather.agricultural.engine import AgriculturalEngine
 from Zweather.industrial.engine import IndustrialEngine
 from Zweather.alerting.rules import AlertRulesEngine
+from Zweather.sovereign import (
+    MAX_DEPTH,
+    MAX_PROOF_SIZE,
+    PHASE_ORDER,
+    PROTOCOL_TAG,
+    ComposeTransitionRequest,
+    SovereignWeatherEngine,
+    WeatherTransition,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +57,7 @@ _construction_engine = ConstructionEngine()
 _agricultural_engine = AgriculturalEngine()
 _industrial_engine = IndustrialEngine()
 _alert_engine = AlertRulesEngine()
+_sovereign_engine = SovereignWeatherEngine()
 
 
 # ---------------------------------------------------------------------------
@@ -76,6 +86,15 @@ class HealthResponse(BaseModel):
     version: str
 
 
+class SovereignProtocolInfo(BaseModel):
+    protocol_tag: str
+    max_depth: int
+    max_proof_size: int
+    accepted_phases: list[str]
+    compatibility_tooling: bool
+    compatibility_endpoints: list[str]
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -88,6 +107,59 @@ def health_check():
         timestamp=datetime.now(timezone.utc).isoformat(),
         version="1.0.0",
     )
+
+
+@app.get("/api/sovereign/protocol", response_model=SovereignProtocolInfo)
+def get_sovereign_protocol():
+    """
+    Describe the RMPE-2 sovereign weather protocol exposed by compatibility tooling.
+    """
+    return SovereignProtocolInfo(
+        protocol_tag=PROTOCOL_TAG,
+        max_depth=MAX_DEPTH,
+        max_proof_size=MAX_PROOF_SIZE,
+        accepted_phases=list(PHASE_ORDER),
+        compatibility_tooling=True,
+        compatibility_endpoints=[
+            "/api/telemetry/ingest",
+            "/api/telemetry/latest",
+            "/api/weather/current",
+            "/api/weather/forecast",
+            "/api/weather/history",
+        ],
+    )
+
+
+@app.post("/api/sovereign/compose")
+def compose_sovereign_transition(request: ComposeTransitionRequest):
+    """
+    Compose an RMPE-2 weather coin transition from operator-tooling inputs.
+    """
+    try:
+        transition = _sovereign_engine.compose_transition(request)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "compose_failed",
+                "error_type": exc.__class__.__name__,
+                "message": str(exc),
+            },
+        )
+    validation = _sovereign_engine.validate_transition(transition)
+    return {
+        "transition": transition.model_dump(),
+        "validation": validation.model_dump(),
+    }
+
+
+@app.post("/api/sovereign/validate")
+def validate_sovereign_transition(transition: WeatherTransition):
+    """
+    Validate a weather coin transition from PREVSTATE and proof inputs alone.
+    """
+    validation = _sovereign_engine.validate_transition(transition)
+    return validation.model_dump()
 
 
 @app.post("/api/analyze")
