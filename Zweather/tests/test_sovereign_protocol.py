@@ -101,7 +101,9 @@ class TestSovereignWeatherEngine:
         result = self.engine.validate_transition(transition)
 
         assert result.valid is False
-        assert any("strictly increase" in trace.message for trace in result.traces if not trace.valid)
+        invalid_traces = [trace for trace in result.traces if not trace.valid]
+        assert len(invalid_traces) == 1
+        assert invalid_traces[0].layer == "prevstate"
 
     def test_settlement_layer_requires_policy_and_settlement_claim(self):
         transition = self.engine.compose_transition(

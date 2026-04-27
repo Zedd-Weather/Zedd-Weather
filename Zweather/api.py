@@ -27,6 +27,7 @@ from Zweather.alerting.rules import AlertRulesEngine
 from Zweather.sovereign import (
     MAX_DEPTH,
     MAX_PROOF_SIZE,
+    PHASE_ORDER,
     PROTOCOL_TAG,
     ComposeTransitionRequest,
     SovereignWeatherEngine,
@@ -117,7 +118,7 @@ def get_sovereign_protocol():
         protocol_tag=PROTOCOL_TAG,
         max_depth=MAX_DEPTH,
         max_proof_size=MAX_PROOF_SIZE,
-        accepted_phases=["data_entry", "consensus", "distribution", "settlement"],
+        accepted_phases=list(PHASE_ORDER),
         compatibility_tooling=True,
         compatibility_endpoints=[
             "/api/telemetry/ingest",
@@ -134,7 +135,10 @@ def compose_sovereign_transition(request: ComposeTransitionRequest):
     """
     Compose an RMPE-2 weather coin transition from operator-tooling inputs.
     """
-    transition = _sovereign_engine.compose_transition(request)
+    try:
+        transition = _sovereign_engine.compose_transition(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     validation = _sovereign_engine.validate_transition(transition)
     return {
         "transition": transition.model_dump(),

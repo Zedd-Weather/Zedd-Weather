@@ -4,6 +4,7 @@ from .engine import SovereignWeatherEngine
 from .protocol import (
     MAX_DEPTH,
     MAX_PROOF_SIZE,
+    PHASE_ORDER,
     PROTOCOL_TAG,
     ComposeTransitionRequest,
     RecursiveLayer,
@@ -19,6 +20,7 @@ __all__ = [
     "ComposeTransitionRequest",
     "MAX_DEPTH",
     "MAX_PROOF_SIZE",
+    "PHASE_ORDER",
     "PROTOCOL_TAG",
     "RecursiveLayer",
     "SovereignWeatherEngine",
