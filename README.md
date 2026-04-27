@@ -143,6 +143,10 @@ Key design properties:
   numbers. Downstream alerts and engines are only ever fed real data.
 - **Pure Python stack.** No Node.js / npm runtime is required to deploy
   the application — the entire UI is rendered by Dash.
+- **Compatibility tooling vs protocol truth.** The FastAPI and Dash layers
+  now also expose a sovereign RMPE-2 protocol surface for composing and
+  validating deterministic weather-state transitions. The HTTP stack is
+  operator tooling; the protocol models the authoritative state machine.
 
 ## Repository structure
 
@@ -334,12 +338,28 @@ UI at `http://localhost:8000/docs`):
 | `POST` | `/api/alerts` | Evaluate alert rules against telemetry and return ordered alerts |
 | `POST` | `/api/telemetry/ingest` | Accept a sensor reading from any Node 1 worker |
 | `GET`  | `/api/telemetry/latest` | Return the most recent ingested sensor snapshot |
+| `GET`  | `/api/sovereign/protocol` | Describe the RMPE-2 sovereign weather protocol and compatibility tooling |
+| `POST` | `/api/sovereign/compose` | Compose a deterministic weather coin transition from weather data, proofs, and optional PREVSTATE |
+| `POST` | `/api/sovereign/validate` | Validate a weather coin transition from state and proof inputs alone |
 | `GET`  | `/api/weather/current?lat=…&lng=…` | Current conditions + today's hourly forecast |
 | `GET`  | `/api/weather/forecast?lat=…&lng=…&days=7` | Multi-day daily forecast |
 | `GET`  | `/api/weather/history?lat=…&lng=…&days=7` | Historical hourly data |
 | `POST` | `/api/ai/risk` | AI risk analysis on live telemetry for a sector |
 | `POST` | `/api/ai/forecast` | AI risk narrative on a multi-day forecast |
 | `POST` | `/api/ai/sitemap` | Site logistics report via local Ollama / Gemma |
+
+The sovereign endpoints introduce a protocol-first model with:
+
+- canonical weather coin state slots for protocol tag, oracle root,
+  depth limit, usage counter, timestamp, phase, and sequence
+- PREVSTATE enforcement for monotonic timestamps and linear phase/sequence
+  transitions
+- proof-gated recursive layers for station identity, geo-fencing, policy,
+  and settlement
+- bounded execution using `MaxDepth = 8` and `MaxProofSize = 2048 bytes`
+
+The legacy telemetry and weather endpoints remain available as
+compatibility tooling for the current Dash frontend and sensor workers.
 
 ### Edge buffering and anomaly detection
 
