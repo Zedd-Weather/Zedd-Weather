@@ -23,6 +23,31 @@ from Zweather.transportation.engine import TransportEngine
 
 logger = logging.getLogger(__name__)
 
+# ── ANSI color helpers ───────────────────────────────────────────────────────
+
+def _c(code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if sys.stdout.isatty() else text
+
+RED = "38;5;196"
+GREEN = "38;5;46"
+AMBER = "38;5;214"
+GREY = "38;5;244"
+BOLD = "1"
+DIM = "2"
+
+RISK_STYLES: dict[str, tuple[str, str]] = {
+    "low": (GREEN, "🟢"),
+    "medium": (AMBER, "🟡"),
+    "high": (RED, "🔴"),
+    "critical": ("38;5;245", "⚫"),
+}
+
+
+def _risk_label(level: str) -> str:
+    code, emoji = RISK_STYLES.get(level.lower(), (GREY, "⚪"))
+    return f"{emoji}  {_c(BOLD + ';' + code, level.upper())}"
+
+
 ENGINES: dict[str, Any] = {
     "construction": ConstructionEngine(),
     "agricultural": AgriculturalEngine(),
@@ -74,7 +99,7 @@ def _parse_telemetry(args: argparse.Namespace) -> dict:
 def cmd_analyze(args: argparse.Namespace) -> None:
     engine = ENGINES.get(args.sector)
     if not engine:
-        print(f"Unknown sector: {args.sector}. Choose from: {', '.join(SECTORS)}")
+        print(f"  {_c(RED, '✗')} Unknown sector: {args.sector}. Choose: {', '.join(SECTORS)}")
         sys.exit(1)
 
     telemetry = _parse_telemetry(args)
@@ -98,22 +123,28 @@ def cmd_analyze(args: argparse.Namespace) -> None:
         print(json.dumps(output, indent=2))
     elif args.output == "summary":
         analysis = output["analysis"]
-        print(f"{'='*60}")
-        print(f"  Zedd Weather — {args.sector.title()} Analysis")
-        print(f"{'='*60}")
-        print(f"  Region:     {analysis.get('region', 'Midlands')}")
-        print(f"  Risk Level: {analysis.get('risk_level', 'N/A').upper()}")
+        level = analysis.get("risk_level", "N/A")
+        region = analysis.get("region", "Midlands")
+        season = analysis.get("season", "")
+        sep = _c(DIM, "━" * 60)
+        print(sep)
+        print(f"  {_c(BOLD, 'Zedd Weather')} — {args.sector.title()} Analysis")
+        print(sep)
+        print(f"  {_c(DIM, 'Region')}      {region}{f'  |  {_c(DIM, 'Season')}  {season.title()}' if season else ''}")
+        print(f"  {_c(DIM, 'Risk Level')}  {_risk_label(level)}")
         if "recommendations" in analysis:
-            print(f"  Recommendations:")
+            print(f"  {_c(DIM, 'Recommendations')}")
             for r in analysis["recommendations"]:
-                print(f"    • {r}")
-        print(f"{'='*60}")
+                print(f"    {_c(DIM, '•')} {r}")
+        print(sep)
 
 
 def cmd_list_sectors(args: argparse.Namespace) -> None:
-    print("Available sectors:")
+    print(f"\n  {_c(BOLD, 'Zedd Weather')} — {_c(DIM, 'Available Sectors')}")
+    print(_c(DIM, "  " + "─" * 30))
     for s in SECTORS:
-        print(f"  • {s}")
+        print(f"    {_c(GREEN, '▸')} {s.title()}")
+    print()
 
 
 def cmd_batch(args: argparse.Namespace) -> None:
@@ -129,12 +160,15 @@ def cmd_batch(args: argparse.Namespace) -> None:
         "results": results,
     }
     if args.output == "summary":
+        print(f"\n  {_c(BOLD, 'Zedd Weather')} — {_c(DIM, 'Batch Analysis')}  ({len(results)} sectors)")
+        print(_c(DIM, "  " + "━" * 56))
         for sector, analysis in results.items():
             rl = analysis.get("risk_level", "N/A")
             recs = analysis.get("recommendations", [])
-            print(f"[{sector}] Risk: {rl.upper()}")
+            print(f"  {_risk_label(rl)}  {_c(BOLD, sector.title())}")
             for r in recs[:2]:
-                print(f"         • {r}")
+                print(f"     {_c(DIM, '•')} {r}")
+            print()
     else:
         print(json.dumps(output, indent=2))
 
@@ -220,9 +254,9 @@ def cmd_report(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     if success:
-        print(f"Report sent successfully for {len(results)} sector(s).")
+        print(f"  {_c(GREEN, '✓')} Report sent for {len(results)} sector(s).")
     else:
-        print("Failed to send report. Check SMTP configuration.")
+        print(f"  {_c(RED, '✗')} Failed to send report. Check SMTP configuration.")
         sys.exit(1)
 
 

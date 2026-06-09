@@ -40,6 +40,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import dash_bootstrap_components as dbc
@@ -50,6 +51,15 @@ from dash import Dash, Input, Output, State, callback, ctx, dcc, html, no_update
 logger = logging.getLogger(__name__)
 
 API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
+
+_DASH_DIR = Path(__file__).parent
+_ASSETS_DIR = _DASH_DIR / "assets"
+os.environ["DASH_ASSETS_FOLDER"] = str(_ASSETS_DIR)
+
+# Toast notification state
+_TOAST_STORE = "toast-store"
+_TOAST_DISMISS = "toast-dismiss"
+_TOAST_CONTAINER = "toast-container"
 
 def _default_lat() -> float:
     raw = os.getenv("DEFAULT_LAT")
@@ -203,6 +213,18 @@ def _risk_badge(level: str | None) -> html.Div:
         ],
         style={"marginBottom": "12px"},
     )
+
+
+# ── Toast notification helper ───────────────────────────────────────────────
+
+def _toast(title: str, message: str, toast_type: str = "info") -> dict[str, Any]:
+    return {
+        "id": str(uuid.uuid4()),
+        "title": title,
+        "message": message,
+        "type": toast_type,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -490,11 +512,10 @@ def _header() -> html.Header:
                     [
                         html.Div(id="alert-header-badge"),
                         html.Div(
-                            [
-                                html.Div(
-                                    style={"width": "8px", "height": "8px", "borderRadius": "50%", "backgroundColor": C["emerald"], "marginRight": "6px"},
-                                ),
-                                html.Span("Connected", style={"fontSize": "12px", "color": C["slate400"]}),
+                            id="connection-indicator",
+                            children=[
+                                html.Div(id="connection-dot", className="connected-dot online"),
+                                html.Span("Connected", id="connection-text", style={"fontSize": "12px", "color": C["slate400"]}),
                             ],
                             style={"display": "flex", "alignItems": "center", "backgroundColor": C["card"], "padding": "6px 12px", "borderRadius": "20px", "border": f"1px solid {C['slate800']}"},
                         ),
@@ -541,6 +562,10 @@ app.layout = html.Div(
         dcc.Store(id="safety-view", storage_type="memory", data="risk"),
         dcc.Store(id="more-view", storage_type="memory", data="locker"),
         dcc.Interval(id="telemetry-poll", interval=60_000, n_intervals=0),
+        # ── Toast notifications ──────────────────────────────────────────
+        dcc.Store(id=_TOAST_STORE, storage_type="memory"),
+        dcc.Interval(id=_TOAST_DISMISS, interval=5000, n_intervals=0),
+        html.Div(id=_TOAST_CONTAINER),
         # ── Header ────────────────────────────────────────────────────────
         _header(),
         # ── Main ──────────────────────────────────────────────────────────
@@ -554,7 +579,7 @@ app.layout = html.Div(
                             id=f"tab-btn-{tab['id']}",
                             n_clicks=0,
                             className="zedd-tab-btn",
-                            **{"data-tab": tab["id"]},
+                            **{"data-tab": tab["id"], "data-active": "false"},
                         )
                         for tab in _TAB_DEFS
                     ],
@@ -587,14 +612,29 @@ def _switch_tab(*_: int) -> str:
     return str(ctx.triggered_id).replace("tab-btn-", "")
 
 
-@callback(Output("tab-content", "children"), Input("active-tab", "data"))
-def _render_tab(tab: str) -> html.Div:
-    return {
+@callback(
+    Output("tab-content", "children"),
+    Output("tab-nav", "children"),
+    Input("active-tab", "data"),
+)
+def _render_tab(tab: str) -> tuple:
+    content = {
         "weather": _weather_layout,
         "safety": _safety_layout,
         "forecast": _forecast_layout,
         "more": _more_layout,
     }.get(tab, _weather_layout)()
+    nav_btns = [
+        html.Button(
+            t["label"],
+            id=f"tab-btn-{t['id']}",
+            n_clicks=0,
+            className="zedd-tab-btn" + (" active" if t["id"] == tab else ""),
+            **{"data-tab": t["id"], "data-active": "true" if t["id"] == tab else "false"},
+        )
+        for t in _TAB_DEFS
+    ]
+    return content, nav_btns
 
 
 # ── Live telemetry polling ───────────────────────────────────────────────────
@@ -658,6 +698,7 @@ def _update_metric_cards(store: dict[str, Any] | None) -> tuple:
                     ]
                 ),
             ],
+            className="metric-card",
             style={
                 "backgroundColor": C["card"],
                 "border": f"1px solid {C['slate800']}",
@@ -676,7 +717,23 @@ def _update_metric_cards(store: dict[str, Any] | None) -> tuple:
         _card("AQI", f"{t.get('aqi', 42):.0f}", "", C["rose"]),
     ]
     ts = store.get("timestamp")
-    updated = f"Updated {ts[:19].replace('T', ' ')} UTC" if ts else ""
+    if ts:
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            delta = datetime.now(timezone.utc) - dt
+            if delta.total_seconds() < 60:
+                rel = "just now"
+            elif delta.total_seconds() < 3600:
+                rel = f"{int(delta.total_seconds() // 60)}m ago"
+            elif delta.total_seconds() < 86400:
+                rel = f"{int(delta.total_seconds() // 3600)}h ago"
+            else:
+                rel = f"{int(delta.total_seconds() // 86400)}d ago"
+            updated = f"↺  {rel}"
+        except (ValueError, TypeError):
+            updated = ""
+    else:
+        updated = ""
     return cards, updated
 
 
@@ -813,6 +870,7 @@ def _dss_summary(store: dict[str, Any] | None) -> html.Div:
 @callback(
     Output("risk-results", "children"),
     Output("risk-store", "data"),
+    Output(_TOAST_STORE, "data", allow_duplicate=True),
     Input("auto-analyze-btn", "n_clicks"),
     State("telemetry-store", "data"),
     State("risk-sector", "value"),
@@ -820,7 +878,7 @@ def _dss_summary(store: dict[str, Any] | None) -> html.Div:
 )
 def _auto_analyze(n: int, store: dict[str, Any] | None, sector: str | None) -> tuple:
     if not n:
-        return no_update, no_update
+        return no_update, no_update, no_update
     t = (store or {}).get("telemetry") or {}
     result = _api_post(
         "/api/ai/risk",
@@ -852,7 +910,8 @@ def _auto_analyze(n: int, store: dict[str, Any] | None, sector: str | None) -> t
             ),
         ]
     )
-    return ui, {"riskLevel": level, "report": report}
+    toast = _toast("AI Analysis Complete", f"Risk level: {level}", "success" if level == "Green" else "info")
+    return ui, {"riskLevel": level, "report": report}, [toast]
 
 
 # ── Safety tab: heuristic analyze ────────────────────────────────────────────
@@ -860,6 +919,7 @@ def _auto_analyze(n: int, store: dict[str, Any] | None, sector: str | None) -> t
 @callback(
     Output("risk-results", "children", allow_duplicate=True),
     Output("risk-store", "data", allow_duplicate=True),
+    Output(_TOAST_STORE, "data", allow_duplicate=True),
     Input("heuristic-analyze-btn", "n_clicks"),
     State("telemetry-store", "data"),
     State("risk-sector", "value"),
@@ -872,7 +932,7 @@ def _heuristic_analyze(
     region: str | None, season: str | None,
 ) -> tuple:
     if not n:
-        return no_update, no_update
+        return no_update, no_update, no_update
     t = (store or {}).get("telemetry") or {}
     payload = {
         "telemetry": {
@@ -923,7 +983,8 @@ def _heuristic_analyze(
             html.Ul(rec_items, style={"paddingLeft": "20px", "margin": "0"}) if rec_items else "",
         ]
     )
-    return ui, {"riskLevel": level, "report": "\n".join(recs)}
+    toast = _toast("Heuristic Analysis Complete", f"Risk level: {level.title()}", "success" if level == "low" else "info")
+    return ui, {"riskLevel": level, "report": "\n".join(recs)}, [toast]
 
 
 # ── Safety tab: media upload + analyze ──────────────────────────────────────
@@ -1236,6 +1297,68 @@ def _alert_badge(store: dict[str, Any] | None) -> html.Div | str:
             html.Span(f"⚠️  {len(alerts)}", style={"fontSize": "12px", "fontWeight": "700", "color": C["amber"], "backgroundColor": C["amber_dim"], "borderRadius": "12px", "padding": "4px 10px", "border": f"1px solid {C['amber']}40"}),
         ]
     )
+
+
+# ── Toast notification system ────────────────────────────────────────────────
+
+@callback(
+    Output(_TOAST_CONTAINER, "children"),
+    Input(_TOAST_STORE, "data"),
+    Input(_TOAST_DISMISS, "n_intervals"),
+    State(_TOAST_CONTAINER, "children"),
+    prevent_initial_call=True,
+)
+def _manage_toasts(store: list[dict] | None, _interval: int, existing: list | None) -> list:
+    ctx_trigger = ctx.triggered_id
+    existing_list = list(existing or [])
+
+    if ctx_trigger == _TOAST_DISMISS:
+        keep = []
+        for t in existing_list:
+            props = t.get("props", {})
+            if "leaving" in props.get("className", ""):
+                continue
+            created = props.get("id", "")
+            try:
+                ts = datetime.fromisoformat(created.replace("Z", "+00:00"))
+            except (ValueError, AttributeError):
+                ts = datetime.now(timezone.utc)
+            age = (datetime.now(timezone.utc) - ts).total_seconds()
+            if age >= 4.5:
+                t["props"]["className"] = (props.get("className", "") + " leaving").strip()
+            keep.append(t)
+        return keep
+
+    if ctx_trigger == _TOAST_STORE and store:
+        for t in store:
+            if isinstance(t, dict) and "id" not in t.get("props", {}):
+                toast_type = t.get("type", "info")
+                toast_class = f"zedd-toast zedd-toast-{toast_type}"
+                existing_list.append(
+                    html.Div(
+                        [
+                            html.Div(t.get("title", ""), className="zedd-toast-title"),
+                            html.Div(t.get("message", ""), className="zedd-toast-message"),
+                        ],
+                        className=toast_class,
+                        id=t.get("timestamp", str(uuid.uuid4())),
+                    )
+                )
+    return existing_list[-5:]  # keep last 5
+
+
+# ── Connection indicator ────────────────────────────────────────────────────
+
+@callback(
+    Output("connection-dot", "className"),
+    Output("connection-text", "children"),
+    Input("telemetry-store", "data"),
+    Input("telemetry-poll", "n_intervals"),
+)
+def _connection_status(store: dict | None, _n: int) -> tuple:
+    if store and store.get("telemetry"):
+        return "connected-dot online", "Connected"
+    return "connected-dot offline", "Disconnected"
 
 
 # ============================================================================

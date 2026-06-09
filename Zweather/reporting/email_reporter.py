@@ -44,35 +44,51 @@ _HTML_TEMPLATE = """\
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-         background: #0a0a0a; color: #e2e8f0; margin: 0; padding: 20px; }}
+         background: #0a0a0a; color: #e2e8f0; margin: 0; padding: 20px;
+         -webkit-font-smoothing: antialiased; }}
   .container {{ max-width: 700px; margin: 0 auto; }}
-  .header {{ border-bottom: 1px solid #1e293b; padding-bottom: 16px; margin-bottom: 24px; }}
-  .header h1 {{ margin: 0; font-size: 22px; }}
-  .header .sub {{ color: #94a3b8; font-size: 12px; }}
-  .card {{ background: #111111; border: 1px solid #1e293b; border-radius: 10px;
-           padding: 16px; margin-bottom: 16px; }}
-  .card h2 {{ font-size: 14px; color: #cbd5e1; margin: 0 0 12px 0; }}
-  .badge {{ display: inline-block; padding: 4px 14px; border-radius: 6px;
-            font-size: 13px; font-weight: 700; text-transform: uppercase;
+  .header {{ border-bottom: 2px solid #1e293b; padding-bottom: 20px; margin-bottom: 24px; }}
+  .header h1 {{ margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: #f1f5f9; }}
+  .header .sub {{ color: #64748b; font-size: 13px; margin-top: 4px; }}
+  .header .sub span {{ color: #10b981; }}
+  .card {{ background: linear-gradient(135deg, #111111 0%, #141414 100%);
+           border: 1px solid #1e293b; border-radius: 12px;
+           padding: 20px; margin-bottom: 16px; }}
+  .card h2 {{ font-size: 15px; color: #e2e8f0; margin: 0 0 14px 0;
+              font-weight: 700; display: flex; align-items: center; gap: 10px; }}
+  .risk-bar {{ height: 4px; border-radius: 2px; margin-bottom: 14px;
+               background: linear-gradient(90deg, var(--rbar) 0%, var(--rbar) var(--rpct), #1e293b var(--rpct), #1e293b 100%); }}
+  .badge {{ display: inline-block; padding: 3px 12px; border-radius: 5px;
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
             letter-spacing: 0.08em; }}
-  .badge-low {{ background: rgba(34,197,94,0.12); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }}
-  .badge-medium {{ background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }}
-  .badge-high {{ background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }}
-  .badge-critical {{ background: rgba(156,163,175,0.12); color: #9ca3af; border: 1px solid rgba(156,163,175,0.3); }}
-  .rec {{ font-size: 13px; color: #94a3b8; margin: 4px 0; }}
+  .badge-low {{ background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }}
+  .badge-medium {{ background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }}
+  .badge-high {{ background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }}
+  .badge-critical {{ background: rgba(156,163,175,0.15); color: #9ca3af; border: 1px solid rgba(156,163,175,0.3); }}
+  .rec {{ font-size: 13px; color: #94a3b8; margin: 5px 0; padding-left: 4px;
+          border-left: 2px solid #1e293b; }}
   table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
-  th {{ text-align: left; color: #94a3b8; padding: 6px 8px; border-bottom: 1px solid #1e293b; }}
-  td {{ padding: 6px 8px; border-bottom: 1px solid #1e293b; color: #e2e8f0; }}
-  .footer {{ text-align: center; color: #475569; font-size: 11px; margin-top: 24px; }}
+  th {{ text-align: left; color: #64748b; padding: 5px 8px; border-bottom: 1px solid #1e293b;
+        font-weight: 600; width: 40%; }}
+  td {{ padding: 5px 8px; border-bottom: 1px solid #1e293b; color: #e2e8f0; }}
+  tr:last-child th, tr:last-child td {{ border-bottom: none; }}
+  .footer {{ text-align: center; color: #334155; font-size: 11px; margin-top: 28px;
+             border-top: 1px solid #1e293b; padding-top: 16px; }}
+  @media (max-width: 600px) {{
+    body {{ padding: 12px; }}
+    .card {{ padding: 14px; }}
+    table, th, td {{ font-size: 12px; }}
+  }}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
     <h1>☁ Zedd Weather Report</h1>
-    <div class="sub">{timestamp} &middot; {region}</div>
+    <div class="sub"><span>{timestamp}</span> &middot; {region}</div>
   </div>
   {sections}
   <div class="footer">
@@ -84,10 +100,26 @@ _HTML_TEMPLATE = """\
 """
 
 
+RISK_LEVEL_PCT: dict[str, int] = {
+    "low": 15, "medium": 40, "high": 70, "critical": 95,
+}
+RISK_LEVEL_COLORS: dict[str, str] = {
+    "low": "#22c55e", "medium": "#f59e0b", "high": "#ef4444", "critical": "#9ca3af",
+}
+
+
 def _risk_badge_html(level: str | None) -> str:
     text = str(level or "unknown")
-    cls = f"badge-{text.lower()}" if text.lower() in ("low", "medium", "high", "critical") else "badge-medium"
+    key = text.lower()
+    cls = f"badge-{key}" if key in ("low", "medium", "high", "critical") else "badge-medium"
     return f'<span class="badge {cls}">{text}</span>'
+
+
+def _risk_bar_html(level: str | None) -> str:
+    key = str(level or "medium").lower()
+    pct = RISK_LEVEL_PCT.get(key, 40)
+    color = RISK_LEVEL_COLORS.get(key, "#f59e0b")
+    return f'<div class="risk-bar" style="--rbar:{color};--rpct:{pct}%"></div>'
 
 
 def _build_report_html(
@@ -125,12 +157,13 @@ def _build_report_html(
 
         section = f"""\
 <div class="card">
-  <h2>{sector.title()} — {_risk_badge_html(risk)}</h2>
+  <h2>{sector.title()}  {_risk_badge_html(risk)}</h2>
+  {_risk_bar_html(risk)}
   <table>
     <tr><th>Region</th><td>{region_name}</td></tr>
     {detail_rows}
   </table>
-  {("<ul style='margin:8px 0 0 0;padding-left:20px'>" + rec_html + "</ul>") if rec_html else ""}
+  {("<ul style='margin:10px 0 0 0;padding-left:4px'>" + rec_html + "</ul>") if rec_html else ""}
 </div>
 """
         sections_html += section
