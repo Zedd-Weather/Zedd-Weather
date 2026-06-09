@@ -1,10 +1,13 @@
-"""Tests for Zweather.industrial.engine"""
+"""Tests for Zweather.industrial.engine — refined with region support."""
 from Zweather.industrial.engine import IndustrialEngine
 from Zweather.industrial.models import (
     FACILITY_PROFILES,
     EquipmentAssessment,
     OperationalWindow,
+    IndustrialHazard,
+    MaterialRisk,
 )
+from Zweather.global_regions.models import UKRegion, Season
 
 
 class TestIndustrialEngine:
@@ -17,10 +20,33 @@ class TestIndustrialEngine:
             "wind_speed": 3.0,
         }
 
+    # ------------------------------------------------------------------
+    # Core API
+    # ------------------------------------------------------------------
+
     def test_analyze_returns_dict(self):
         result = self.engine.analyze(self.normal_telemetry)
         assert isinstance(result, dict)
         assert "risk_level" in result
+        assert result["region"] == "Midlands"
+
+    def test_analyze_with_region(self):
+        result = self.engine.analyze(self.normal_telemetry, region="glasgow")
+        assert result["region"] == "West Scotland (Glasgow)"
+
+    def test_analyze_with_region_enum(self):
+        result = self.engine.analyze(
+            self.normal_telemetry, region=UKRegion.SOUTHERN_ENGLAND
+        )
+        assert result["region"] == "Southern England"
+
+    def test_analyze_with_season(self):
+        result = self.engine.analyze(self.normal_telemetry, season="winter")
+        assert result["season"] == "winter"
+
+    # ------------------------------------------------------------------
+    # Risk level
+    # ------------------------------------------------------------------
 
     def test_risk_level_normal_conditions(self):
         risk = self.engine.compute_risk_level(self.normal_telemetry, "general")
@@ -41,6 +67,10 @@ class TestIndustrialEngine:
         risk = self.engine.compute_risk_level(freezing, "general")
         assert risk in ("high", "critical")
 
+    # ------------------------------------------------------------------
+    # Equipment safety
+    # ------------------------------------------------------------------
+
     def test_equipment_safety_assessment(self):
         result = self.engine.assess_equipment_safety(self.normal_telemetry)
         assert isinstance(result, EquipmentAssessment)
@@ -50,6 +80,19 @@ class TestIndustrialEngine:
         assert 0.0 <= result.worker_cold_index <= 1.0
         assert isinstance(result.ppe_recommendations, list)
         assert len(result.ppe_recommendations) > 0
+
+    def test_equipment_safety_glasgow_winter(self):
+        chilly = {**self.normal_telemetry, "temperature": 2.0, "wind_speed": 8.0}
+        result = self.engine.assess_equipment_safety(
+            chilly, "general", region="glasgow", season="winter"
+        )
+        assert isinstance(result, EquipmentAssessment)
+        # Glasgow winter with wind should register cold stress
+        assert result.worker_cold_index > 0.0
+
+    # ------------------------------------------------------------------
+    # Operational window
+    # ------------------------------------------------------------------
 
     def test_operational_window_evaluation(self):
         result = self.engine.evaluate_operational_window(
@@ -70,27 +113,73 @@ class TestIndustrialEngine:
         assert result.safe_to_proceed is False
         assert len(result.halt_reasons) > 0
 
-    def test_weather_hazard_detection(self):
-        hazards = self.engine.detect_weather_hazards(
+    def test_normal_conditions_safe_to_proceed(self):
+        result = self.engine.evaluate_operational_window(
             self.normal_telemetry, "general"
         )
+        assert result.safe_to_proceed is True
+        assert result.risk_level == "low"
+
+    def test_wind_gust_halt(self):
+        gusty = {**self.normal_telemetry, "wind_speed": 5.0, "wind_gust": 32.0}
+        result = self.engine.evaluate_operational_window(gusty, "manufacturing")
+        # Manufacturing wind_gust_halt = 30.0
+        assert result.safe_to_proceed is False
+        assert any("gust" in r.lower() for r in result.halt_reasons)
+
+    def test_visibility_halt(self):
+        foggy = {**self.normal_telemetry, "visibility_m": 30.0}
+        result = self.engine.evaluate_operational_window(foggy, "chemical")
+        assert result.safe_to_proceed is False
+        assert any("visibility" in r.lower() for r in result.halt_reasons)
+
+    def test_glasgow_higher_rain_tolerance(self):
+        """Glasgow has higher rain thresholds — same rain less disruptive."""
+        rainy = {**self.normal_telemetry, "rainfall_mm": 8.0}
+        mids = self.engine.evaluate_operational_window(rainy, "general", region="midlands")
+        glas = self.engine.evaluate_operational_window(rainy, "general", region="glasgow")
+        assert len(glas.halt_reasons) <= len(mids.halt_reasons)
+
+    # ------------------------------------------------------------------
+    # Weather hazards
+    # ------------------------------------------------------------------
+
+    def test_weather_hazard_detection(self):
+        hazards = self.engine.detect_weather_hazards(self.normal_telemetry, "general")
         assert isinstance(hazards, list)
+        assert isinstance(hazards[0], IndustrialHazard)
 
     def test_extreme_wind_hazard(self):
         windy = {**self.normal_telemetry, "wind_speed": 25.0}
         hazards = self.engine.detect_weather_hazards(windy, "general")
-        hazard_names = [h["hazard"] for h in hazards]
+        hazard_names = [h.hazard for h in hazards]
         assert "Extreme Wind" in hazard_names
 
     def test_process_risk_detection(self):
-        risks = self.engine.detect_process_risks(self.normal_telemetry, "general")
+        risks = self.engine.detect_material_risks(self.normal_telemetry, "general")
         assert isinstance(risks, list)
+        assert isinstance(risks[0], MaterialRisk)
 
     def test_equipment_overheating_risk(self):
         hot = {**self.normal_telemetry, "temperature": 55.0}
-        risks = self.engine.detect_process_risks(hot, "manufacturing")
-        process_names = [r["process"] for r in risks]
-        assert "Equipment Overheating" in process_names
+        risks = self.engine.detect_material_risks(hot, "manufacturing")
+        material_names = [r.material for r in risks]
+        assert "Heat-Sensitive Equipment" in material_names
+
+    def test_chemical_static_discharge_risk(self):
+        dry = {**self.normal_telemetry, "humidity": 20.0}
+        risks = self.engine.detect_material_risks(dry, "chemical")
+        material_names = [r.material for r in risks]
+        assert "Flammable Materials / Vapours" in material_names
+
+    def test_aqi_halt(self):
+        polluted = {**self.normal_telemetry, "aqi": 250.0}
+        result = self.engine.evaluate_operational_window(polluted, "general")
+        assert result.safe_to_proceed is False
+
+    # ------------------------------------------------------------------
+    # Cross-facility
+    # ------------------------------------------------------------------
 
     def test_all_facility_profiles_analyzable(self):
         for facility_key in FACILITY_PROFILES:
@@ -100,28 +189,7 @@ class TestIndustrialEngine:
             assert "risk_level" in result
 
     def test_missing_telemetry_keys(self):
-        """Engine should handle missing keys gracefully."""
         partial = {"temperature": 20.0}
         result = self.engine.analyze(partial, "general")
         assert isinstance(result, dict)
-
-    def test_normal_conditions_safe_to_proceed(self):
-        """Normal conditions should allow operations to proceed."""
-        result = self.engine.evaluate_operational_window(
-            self.normal_telemetry, "general"
-        )
-        assert result.safe_to_proceed is True
-        assert result.risk_level == "low"
-
-    def test_chemical_static_discharge_risk(self):
-        """Low humidity should trigger static discharge risk for chemical."""
-        dry = {**self.normal_telemetry, "humidity": 20.0}
-        risks = self.engine.detect_process_risks(dry, "chemical")
-        process_names = [r["process"] for r in risks]
-        assert "Static Discharge" in process_names
-
-    def test_aqi_halt(self):
-        """High AQI should halt operations."""
-        polluted = {**self.normal_telemetry, "aqi": 250.0}
-        result = self.engine.evaluate_operational_window(polluted, "general")
-        assert result.safe_to_proceed is False
+        assert "risk_level" in result

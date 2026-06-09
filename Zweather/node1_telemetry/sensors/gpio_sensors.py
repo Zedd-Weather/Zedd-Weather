@@ -18,6 +18,12 @@ from Zweather.node1_telemetry import config
 
 logger = logging.getLogger(__name__)
 
+try:
+    import RPi.GPIO as GPIO
+    _GPIO_AVAILABLE = True
+except (ImportError, RuntimeError):
+    _GPIO_AVAILABLE = False
+
 
 class RainGaugeSensor(BaseSensor):
     """Tipping-bucket rain gauge connected via GPIO."""
@@ -37,8 +43,11 @@ class RainGaugeSensor(BaseSensor):
             logger.info("Rain gauge disabled in configuration.")
             return
 
+        if not _GPIO_AVAILABLE:
+            self._available = False
+            return
+
         try:
-            import RPi.GPIO as GPIO
             GPIO.setmode(GPIO.BCM)
             GPIO.setup(config.RAIN_GAUGE_GPIO_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
             GPIO.add_event_detect(
@@ -51,7 +60,7 @@ class RainGaugeSensor(BaseSensor):
             logger.info(
                 "Rain gauge initialised on GPIO %d.", config.RAIN_GAUGE_GPIO_PIN
             )
-        except (ImportError, RuntimeError) as exc:
+        except RuntimeError as exc:
             logger.warning(
                 "Rain gauge GPIO unavailable (%s). No rain gauge readings "
                 "will be emitted.", exc,
@@ -97,7 +106,6 @@ class RainGaugeSensor(BaseSensor):
     def cleanup(self) -> None:
         if self._available:
             try:
-                import RPi.GPIO as GPIO
                 GPIO.remove_event_detect(config.RAIN_GAUGE_GPIO_PIN)
-            except (ImportError, RuntimeError):
+            except (RuntimeError, ValueError):
                 logger.debug("Rain gauge GPIO cleanup failed", exc_info=True)

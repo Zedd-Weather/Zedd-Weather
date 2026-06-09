@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from typing import Optional
 
 from .protocol import (
@@ -67,6 +68,7 @@ class SovereignWeatherEngine:
             recursive_calls=recursive_calls,
             remaining_depth=remaining_depth,
             network_verified=bool(network_traces) and all(trace.valid for trace in network_traces),
+            compatibility_mode=True,
         )
 
     def _validate_core_state(
@@ -359,6 +361,11 @@ class SovereignWeatherEngine:
             return observed_value < threshold
         if comparator == "lte":
             return observed_value <= threshold
+        if comparator == "eq":
+            return observed_value == threshold
+        logging.getLogger(__name__).warning(
+            "Unknown policy comparator '%s' — falling back to eq", comparator,
+        )
         return observed_value == threshold
 
     @staticmethod

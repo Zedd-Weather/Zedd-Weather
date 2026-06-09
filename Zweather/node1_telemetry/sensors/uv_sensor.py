@@ -69,8 +69,13 @@ class UVSensor(BaseSensor):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _read_word(self, register: int) -> int:
-        return self._bus.read_word_data(config.UV_SENSOR_I2C_ADDR, register)
+    def _read_word(self, register: int) -> int | None:
+        if self._bus is None:
+            return None
+        try:
+            return self._bus.read_word_data(config.UV_SENSOR_I2C_ADDR, register)
+        except OSError:
+            return None
 
     # ------------------------------------------------------------------
     # Reading
@@ -86,7 +91,13 @@ class UVSensor(BaseSensor):
         comp1 = self._read_word(_REG_UVCOMP1)
         comp2 = self._read_word(_REG_UVCOMP2)
 
-        # Compensated readings
+        if raw_uva is None or raw_uvb is None:
+            logger.warning("UV sensor read failed — I2C bus error")
+            return {}
+
+        comp1 = comp1 or 0
+        comp2 = comp2 or 0
+
         uva_comp = raw_uva - (_UVA_A * comp1) - (_UVA_B * comp2)
         uvb_comp = raw_uvb - (_UVB_C * comp1) - (_UVB_D * comp2)
 
@@ -103,12 +114,16 @@ class UVSensor(BaseSensor):
     # Cleanup
     # ------------------------------------------------------------------
     def cleanup(self) -> None:
-        if self._bus is not None:
+        bus = self._bus
+        if bus is not None:
             try:
-                # Power down
-                self._bus.write_word_data(
+                bus.write_word_data(
                     config.UV_SENSOR_I2C_ADDR, _REG_CONF, 0x0001
                 )
-                self._bus.close()
             except OSError:
-                logger.debug("UV sensor cleanup failed", exc_info=True)
+                logger.debug("UV sensor power-down failed", exc_info=True)
+            finally:
+                try:
+                    bus.close()
+                except OSError:
+                    logger.debug("UV sensor bus close failed", exc_info=True)

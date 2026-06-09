@@ -14,7 +14,7 @@ Usage:
 import logging
 import threading
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +23,11 @@ from pydantic import BaseModel, Field
 from Zweather.construction.engine import ConstructionEngine
 from Zweather.agricultural.engine import AgriculturalEngine
 from Zweather.industrial.engine import IndustrialEngine
+from Zweather.residential.engine import ResidentialEngine
+from Zweather.marine.engine import MarineEngine
+from Zweather.aviation.engine import AviationEngine
+from Zweather.energy.engine import EnergyEngine
+from Zweather.transportation.engine import TransportEngine
 from Zweather.alerting.rules import AlertRulesEngine
 from Zweather.sovereign import (
     MAX_DEPTH,
@@ -57,6 +62,11 @@ app.add_middleware(
 _construction_engine = ConstructionEngine()
 _agricultural_engine = AgriculturalEngine()
 _industrial_engine = IndustrialEngine()
+_residential_engine = ResidentialEngine()
+_marine_engine = MarineEngine()
+_aviation_engine = AviationEngine()
+_energy_engine = EnergyEngine()
+_transport_engine = TransportEngine()
 _alert_engine = AlertRulesEngine()
 _sovereign_engine = SovereignWeatherEngine()
 
@@ -78,8 +88,10 @@ class TelemetryPayload(BaseModel):
 class AnalyzeRequest(BaseModel):
     """Request body for the /api/analyze endpoint."""
     telemetry: TelemetryPayload
-    sector: str = Field("construction", description="One of: construction, agricultural, industrial")
-    activity: Optional[str] = Field(None, description="Sector-specific activity/crop/facility type")
+    sector: str = Field("construction", description="One of: construction, agricultural, industrial, residential, marine, aviation, energy, transportation")
+    activity: Optional[str] = Field(None, description="Sector-specific activity/crop/facility/vessel/aircraft/asset/transport type")
+    region: Optional[str] = Field(None, description="UK region for climate-adjusted thresholds")
+    season: Optional[str] = Field(None, description="Season for seasonal adjustments")
 
 class HealthResponse(BaseModel):
     status: str
@@ -190,18 +202,36 @@ def analyze(request: AnalyzeRequest):
 
     sector = request.sector.lower()
     activity = request.activity
+    region = request.region
+    season = request.season
 
     try:
+        kwargs = {}
+        if region:
+            kwargs["region"] = region
+        if season:
+            kwargs["season"] = season
+
         if sector == "construction":
-            result = _construction_engine.analyze(telemetry_dict, activity or "general")
+            result = _construction_engine.analyze(telemetry_dict, activity or "general", **kwargs)
         elif sector == "agricultural":
-            result = _agricultural_engine.analyze(telemetry_dict, activity or "maize")
+            result = _agricultural_engine.analyze(telemetry_dict, activity or "maize", **kwargs)
         elif sector == "industrial":
-            result = _industrial_engine.analyze(telemetry_dict, activity or "general")
+            result = _industrial_engine.analyze(telemetry_dict, activity or "general", **kwargs)
+        elif sector == "residential":
+            result = _residential_engine.analyze(telemetry_dict, activity or "general", **kwargs)
+        elif sector == "marine":
+            result = _marine_engine.analyze(telemetry_dict, activity or "general", **kwargs)
+        elif sector == "aviation":
+            result = _aviation_engine.analyze(telemetry_dict, activity or "general", **kwargs)
+        elif sector == "energy":
+            result = _energy_engine.analyze(telemetry_dict, activity or "general", **kwargs)
+        elif sector == "transportation":
+            result = _transport_engine.analyze(telemetry_dict, activity or "general", **kwargs)
         else:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unknown sector: '{sector}'. Must be one of: construction, agricultural, industrial"
+                detail=f"Unknown sector: '{sector}'. Must be one of: construction, agricultural, industrial, residential, marine, aviation, energy, transportation"
             )
     except HTTPException:
         raise
@@ -380,6 +410,84 @@ async def weather_history(
 
 
 # ---------------------------------------------------------------------------
+# Email Reporting endpoint
+# ---------------------------------------------------------------------------
+
+
+class EmailReportRequest(BaseModel):
+    """Request body for ``POST /api/report``."""
+    telemetry: TelemetryPayload
+    sector: Optional[str] = Field(
+        None, description="Single sector to report (None = all 8)"
+    )
+    region: Optional[str] = Field(None, description="UK region")
+    season: Optional[str] = Field(None, description="Season")
+
+
+@app.post("/api/report", status_code=202)
+async def send_email_report(request: EmailReportRequest):
+    """
+    Run heuristic analysis on all (or one) sector and email the report.
+    Requires SMTP environment variables: SMTP_HOST, SMTP_PORT, SMTP_USER,
+    SMTP_PASSWORD, SMTP_TO, SMTP_FROM.
+    """
+    telemetry_dict: dict[str, Any] = {
+        "temperature": request.telemetry.temperature,
+        "humidity": request.telemetry.humidity,
+        "pressure": request.telemetry.pressure,
+    }
+    if request.telemetry.wind_speed is not None:
+        telemetry_dict["wind_speed"] = request.telemetry.wind_speed
+    if request.telemetry.rainfall_mm is not None:
+        telemetry_dict["rainfall_mm"] = request.telemetry.rainfall_mm
+    if request.telemetry.aqi is not None:
+        telemetry_dict["aqi"] = request.telemetry.aqi
+    if request.telemetry.uv_index is not None:
+        telemetry_dict["uv_index"] = request.telemetry.uv_index
+
+    kwargs: dict[str, Any] = {}
+    if request.region:
+        kwargs["region"] = request.region
+    if request.season:
+        kwargs["season"] = request.season
+
+    results: dict[str, Any] = {}
+    sectors = [request.sector] if request.sector else [
+        "construction", "agricultural", "industrial", "residential",
+        "marine", "aviation", "energy", "transportation",
+    ]
+    sector_engines = {
+        "construction": _construction_engine,
+        "agricultural": _agricultural_engine,
+        "industrial": _industrial_engine,
+        "residential": _residential_engine,
+        "marine": _marine_engine,
+        "aviation": _aviation_engine,
+        "energy": _energy_engine,
+        "transportation": _transport_engine,
+    }
+    for s in sectors:
+        eng = sector_engines.get(s)
+        if eng:
+            results[s] = cast(Any, eng).analyze(telemetry_dict, "general", **kwargs)
+
+    try:
+        from Zweather.reporting.email_reporter import send_report
+        success = send_report(results, region=request.region or "Midlands")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Email report failed: {exc}")
+
+    if not success:
+        raise HTTPException(status_code=502, detail="Email report send failed. Check SMTP config.")
+
+    return {
+        "sent": True,
+        "sectors": list(results.keys()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Server-side AI endpoints (local Ollama / Gemma)
 # ---------------------------------------------------------------------------
 
@@ -402,7 +510,7 @@ class AIRiskRequest(BaseModel):
     telemetry: AITelemetryPayload
     sector: str = Field(
         "construction",
-        description="One of: construction, agricultural, industrial",
+        description="One of: construction, agricultural, industrial, residential, marine, aviation, energy, transportation",
     )
 
 
@@ -435,7 +543,7 @@ class AIForecastRequest(BaseModel):
     )
     sector: str = Field(
         "construction",
-        description="One of: construction, agricultural, industrial",
+        description="One of: construction, agricultural, industrial, residential, marine, aviation, energy, transportation",
     )
 
 

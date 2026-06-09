@@ -10,11 +10,6 @@ from dotenv import load_dotenv
 import paho.mqtt.client as mqtt
 from Zweather.ollama_inference.client import OllamaClient
 
-# Configure logging for headless edge deployment
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 logger = logging.getLogger("ZeddOrchestrator")
 
 # Initialize thread-safe queue for non-blocking MQTT ingestion
@@ -45,7 +40,18 @@ def fetch_accuweather_forecast(lat: float, lon: float) -> dict:
 
     try:
         import requests  # type: ignore
+    except ImportError:
+        logger.error("requests library not available for AccuWeather API.")
+        return {
+            "forecast_days": 0,
+            "avg_temp_c": None,
+            "max_wind_speed_ms": None,
+            "precip_probability_pct": None,
+            "severe_weather_alerts": [],
+            "source": "error",
+        }
 
+    try:
         # Step 1: Resolve lat/lon to an AccuWeather location key
         geo_url = (
             f"{base_url}/locations/v1/cities/geoposition/search"
@@ -114,7 +120,7 @@ def fetch_accuweather_forecast(lat: float, lon: float) -> dict:
             "severe_weather_alerts": alerts,
             "source": "accuweather",
         }
-    except Exception as e:
+    except requests.RequestException as e:
         logger.error("AccuWeather API request failed: %s", e)
         return {
             "forecast_days": 0,
@@ -149,8 +155,8 @@ def generate_mitigation_strategy(telemetry: dict, forecast: dict) -> str:
     try:
         response = client.generate(prompt=prompt, model=model)
         return response.strip()
-    except Exception as e:
-        logger.error(f"AI Inference failed: {e}")
+    except (OSError, RuntimeError, ValueError) as e:
+        logger.error("AI Inference failed: %s", e)
         return "ERROR: Mitigation strategy generation failed due to inference error."
 
 def inference_worker():
@@ -205,12 +211,11 @@ def inference_worker():
                 attestation_payload["signature"] = signature
             
             logger.info("Attestation generated successfully.")
-            
-            # Signal task completion to the queue
-            telemetry_queue.task_done()
-            
+
         except Exception as e:
-            logger.error(f"Error in inference worker pipeline: {e}")
+            logger.error("Error in inference worker pipeline: %s", e)
+        finally:
+            telemetry_queue.task_done()
 
 def on_connect(client, userdata, flags, rc):
     """MQTT on_connect callback."""
@@ -219,7 +224,7 @@ def on_connect(client, userdata, flags, rc):
         client.subscribe("weather_station/telemetry")
         logger.info("Subscribed to topic: weather_station/telemetry")
     else:
-        logger.error(f"Failed to connect to MQTT broker. Return code: {rc}")
+        logger.error("Failed to connect to MQTT broker. Return code: %s", rc)
 
 def on_message(client, userdata, msg):
     """
@@ -236,12 +241,12 @@ def on_message(client, userdata, msg):
             telemetry_queue.put(payload)
             logger.debug("Payload queued for inference.")
         else:
-            logger.warning(f"Malformed payload received (missing keys): {payload_str}")
+            logger.warning("Malformed payload received (missing keys): %s", payload_str)
             
     except json.JSONDecodeError:
         logger.error("Failed to decode JSON from MQTT payload.")
-    except Exception as e:
-        logger.error(f"Unexpected error in on_message: {e}")
+    except (KeyError, ValueError) as e:
+        logger.error("Unexpected error in on_message: %s", e)
 
 def main():
     """Main application entry point."""
@@ -260,17 +265,21 @@ def main():
     broker_port = int(os.getenv("MQTT_BROKER_PORT", 1883))
     
     try:
-        logger.info(f"Connecting to MQTT broker at {broker_host}:{broker_port}...")
+        logger.info("Connecting to MQTT broker at %s:%s...", broker_host, broker_port)
         client.connect(broker_host, broker_port, 60)
         
         # Start the non-blocking network loop
         client.loop_forever()
     except KeyboardInterrupt:
         logger.info("Shutdown signal received. Exiting...")
-    except Exception as e:
-        logger.critical(f"Fatal MQTT error: {e}")
+    except (OSError, RuntimeError) as e:
+        logger.critical("Fatal MQTT error: %s", e)
     finally:
         client.disconnect()
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
     main()

@@ -8,7 +8,7 @@ Depending on enabled sensors and services, a deployment may process:
 
 - Weather readings such as temperature, humidity, pressure, wind speed, wind direction, rainfall, UV index, and air-quality values.
 - Hardware diagnostics such as node identifier, sensor availability, Hailo AI HAT+ status, and local timestamps.
-- Risk-analysis outputs such as sector, profile, risk score, breached rules, alerts, and recommended mitigations.
+- Risk-analysis outputs such as sector (construction, agricultural, industrial, residential, marine), profile, risk score, breached rules, alerts, and recommended mitigations.
 - Optional site context entered by operators for forecast, risk, or logistics guidance.
 - Operational logs from FastAPI, Dash, MQTT, Docker, InfluxDB, Grafana, and worker processes.
 

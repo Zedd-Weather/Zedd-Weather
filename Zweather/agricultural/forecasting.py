@@ -161,8 +161,10 @@ class WeatherForecaster:
     # ---------------------------------------------------------------------------
 
     @staticmethod
-    def _extract(readings: list[dict], key: str, default: float = 20.0) -> list[float]:
+    def _extract(readings: list[dict], key: str) -> list[float]:
         """Extract a numeric metric from a list of reading dicts."""
+        defaults = {"temperature": 20.0, "humidity": 50.0, "pressure": 1013.0}
+        default = defaults.get(key, 0.0)
         return [float(r.get(key, default)) for r in readings]
 
     @staticmethod

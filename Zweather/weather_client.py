@@ -4,6 +4,7 @@ Server-side Google Weather API client.
 All calls are made server-side so the API key is never exposed to the browser.
 Reads the key from the GOOGLE_WEATHER_API_KEY environment variable.
 """
+import asyncio
 import logging
 import os
 from typing import Any
@@ -16,6 +17,22 @@ GOOGLE_WEATHER_BASE = "https://weather.googleapis.com/v1"
 _DEFAULT_AQI = 42
 _DEFAULT_TIDE = 1.2
 _KMH_TO_MS_DIVISOR = 3.6  # divide km/h by this to get m/s
+
+# Shared session for connection reuse across all requests.
+_session: aiohttp.ClientSession | None = None
+_session_lock = asyncio.Lock()
+
+
+class GoogleWeatherAPIError(Exception):
+    pass
+
+
+async def _get_session() -> aiohttp.ClientSession:
+    global _session
+    async with _session_lock:
+        if _session is None or _session.closed:
+            _session = aiohttp.ClientSession()
+    return _session
 
 
 def _api_key() -> str:
@@ -36,14 +53,22 @@ async def get_current_conditions(lat: float, lng: float) -> dict[str, Any]:
     hourly_url = f"{GOOGLE_WEATHER_BASE}/forecast:lookup?key={key}"
     loc_body = {"location": {"latitude": lat, "longitude": lng}}
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(current_url, json=loc_body) as current_resp:
-            current = await current_resp.json()
-        async with session.post(
-            hourly_url,
-            json={**loc_body, "days": 1, "hourlyForHours": 24},
-        ) as hourly_resp:
-            hourly_raw = await hourly_resp.json()
+    session = await _get_session()
+    async with session.post(current_url, json=loc_body) as current_resp:
+        if current_resp.status != 200:
+            raise GoogleWeatherAPIError(
+                f"Current conditions returned {current_resp.status}"
+            )
+        current = await current_resp.json()
+    async with session.post(
+        hourly_url,
+        json={**loc_body, "days": 1, "hourlyForHours": 24},
+    ) as hourly_resp:
+        if hourly_resp.status != 200:
+            raise GoogleWeatherAPIError(
+                f"Hourly forecast returned {hourly_resp.status}"
+            )
+        hourly_raw = await hourly_resp.json()
 
     telemetry: dict[str, Any] = {
         "temp": (current.get("temperature") or {}).get("degrees", 0.0),
@@ -82,15 +107,19 @@ async def get_forecast(lat: float, lng: float, days: int = 7) -> list[dict[str, 
     key = _api_key()
     url = f"{GOOGLE_WEATHER_BASE}/forecast:lookup?key={key}"
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            url,
-            json={
-                "location": {"latitude": lat, "longitude": lng},
-                "days": days,
-            },
-        ) as resp:
-            data = await resp.json()
+    session = await _get_session()
+    async with session.post(
+        url,
+        json={
+            "location": {"latitude": lat, "longitude": lng},
+            "days": days,
+        },
+    ) as resp:
+        if resp.status != 200:
+            raise GoogleWeatherAPIError(
+                f"Forecast returned {resp.status}"
+            )
+        data = await resp.json()
 
     result: list[dict[str, Any]] = []
     for day in data.get("forecastDays", []):
@@ -126,16 +155,20 @@ async def get_history(
     key = _api_key()
     url = f"{GOOGLE_WEATHER_BASE}/history:lookup?key={key}"
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            url,
-            json={
-                "location": {"latitude": lat, "longitude": lng},
-                "days": days,
-                "hourly": True,
-            },
-        ) as resp:
-            data = await resp.json()
+    session = await _get_session()
+    async with session.post(
+        url,
+        json={
+            "location": {"latitude": lat, "longitude": lng},
+            "days": days,
+            "hourly": True,
+        },
+    ) as resp:
+        if resp.status != 200:
+            raise GoogleWeatherAPIError(
+                f"History returned {resp.status}"
+            )
+        data = await resp.json()
 
     step = 6 if days <= 7 else (12 if days <= 14 else 24)
     result: list[dict[str, Any]] = []

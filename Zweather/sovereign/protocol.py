@@ -126,7 +126,7 @@ class SettlementClaim(BaseModel):
 class WeatherCoinState(BaseModel):
     """Canonical state carried by an RMPE-2 weather coin."""
 
-    protocol_tag: Literal[PROTOCOL_TAG] = PROTOCOL_TAG
+    protocol_tag: Literal["RMPE2-WEATHER"] = "RMPE2-WEATHER"
     oracle_root: str = Field(..., min_length=1)
     depth_limit: int = Field(MAX_DEPTH, ge=0, le=MAX_DEPTH)
     usage_counter: int = Field(0, ge=0)
@@ -189,7 +189,7 @@ class ValidationResult(BaseModel):
     """Validation outcome for a weather coin transition."""
 
     valid: bool
-    protocol_tag: Literal[PROTOCOL_TAG] = PROTOCOL_TAG
+    protocol_tag: Literal["RMPE2-WEATHER"] = "RMPE2-WEATHER"
     traces: list[ValidationTrace]
     recursive_calls: int = Field(..., ge=0)
     remaining_depth: int = Field(..., ge=0, le=MAX_DEPTH)

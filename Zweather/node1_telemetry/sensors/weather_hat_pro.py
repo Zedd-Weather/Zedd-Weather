@@ -79,6 +79,7 @@ class WeatherHatProDriver(BaseSensor):
         super().__init__("weather_hat_pro")
         self._bme280 = None
         self._adc = None
+        self._bus = None
 
         # Pulse counters (incremented from GPIO interrupt callbacks).
         self._anemometer_pulses = 0
@@ -101,14 +102,15 @@ class WeatherHatProDriver(BaseSensor):
         try:
             from bme280 import BME280  # type: ignore[import-untyped]
             from smbus2 import SMBus  # type: ignore[import-untyped]
-            bus = SMBus(config.WEATHER_HAT_PRO_I2C_BUS)
-            self._bme280 = BME280(i2c_dev=bus)
+            self._bus = SMBus(config.WEATHER_HAT_PRO_I2C_BUS)
+            self._bme280 = BME280(i2c_dev=self._bus)
             # Discard first reading (sensor warm-up).
             self._bme280.get_temperature()
             any_ok = True
             logger.info("Weather HAT PRO BME280 initialized.")
         except (ImportError, OSError) as exc:
             logger.warning("Weather HAT PRO BME280 unavailable (%s).", exc)
+            self._bus = None
 
         # MCP3008 / ADS1015 ADC for the wind vane.
         try:
@@ -125,7 +127,8 @@ class WeatherHatProDriver(BaseSensor):
         # GPIO reed-switch counters for the anemometer and rain gauge.
         try:
             import RPi.GPIO as GPIO  # type: ignore[import-untyped]
-            GPIO.setmode(GPIO.BCM)
+            if GPIO.getmode() is None:
+                GPIO.setmode(GPIO.BCM)
             GPIO.setup(
                 config.WEATHER_HAT_PRO_ANEMOMETER_GPIO_PIN,
                 GPIO.IN, pull_up_down=GPIO.PUD_UP,
@@ -207,6 +210,7 @@ class WeatherHatProDriver(BaseSensor):
             self._anemometer_pulses = 0
             rain_pulses = self._rain_pulses
             self._rain_pulses = 0
+            rain_total_pulses = self._rain_total_pulses
             elapsed = max(now - self._last_read_time, _MIN_ELAPSED_SECONDS)
             self._last_read_time = now
 
@@ -218,7 +222,7 @@ class WeatherHatProDriver(BaseSensor):
             rain_pulses * config.WEATHER_HAT_PRO_RAIN_MM_PER_TIP, 3
         )
         data["rain_total_mm"] = round(
-            self._rain_total_pulses * config.WEATHER_HAT_PRO_RAIN_MM_PER_TIP, 3
+            rain_total_pulses * config.WEATHER_HAT_PRO_RAIN_MM_PER_TIP, 3
         )
 
         # --- Wind vane (analog → bearing) ---
@@ -290,5 +294,11 @@ class WeatherHatProDriver(BaseSensor):
                     )
         except (ImportError, RuntimeError):
             logger.debug("Weather HAT PRO GPIO cleanup unavailable", exc_info=True)
+        if self._bus is not None:
+            try:
+                self._bus.close()
+            except OSError:
+                logger.debug("Weather HAT PRO SMBus close failed", exc_info=True)
         self._bme280 = None
         self._adc = None
+        self._bus = None

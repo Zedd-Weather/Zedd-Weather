@@ -5,19 +5,20 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB.svg?logo=python&logoColor=white)](Zweather/requirements.txt)
 [![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED.svg?logo=docker&logoColor=white)](docker-compose.yml)
+[![Pi Zero 2WH](https://img.shields.io/badge/Pi%20Zero%202WH-Coral-FF6F00.svg?logo=raspberrypi&logoColor=white)](Dockerfile.pizero)
 
-**Zedd Weather is an edge-native weather telemetry, alerting, and risk-analysis platform for industrial, agricultural, and construction operations.** It is built for Raspberry Pi clusters with real weather hardware, local storage, server-side weather APIs, and on-device AI inference, so operators can make decisions close to the site without depending on a cloud round trip.
+**Zedd Weather is an edge-native weather telemetry, alerting, and risk-analysis platform for construction, agricultural, industrial, residential, marine, aviation, energy, and transportation operations.** It is built for Raspberry Pi clusters with real weather hardware, local storage, server-side weather APIs, and on-device AI inference (Hailo-8L NPU or Google Coral Edge TPU), so operators can make decisions close to the site without depending on a cloud round trip.
 
 > **No simulators.** Zedd Weather deliberately avoids synthetic sensor data. If hardware is absent, drivers report that they are unavailable and emit no readings instead of inventing values.
 
 ## Why Zedd Weather?
 
-- **Real hardware first** — BCRobotics Weather HAT PRO, optional Sense HAT, Enviro+, UV, Modbus/RS485, and Hailo AI HAT+ support.
-- **Edge resilient** — local MQTT, InfluxDB, SQLite buffering, Docker Compose deployment, and optional three-node Pi cluster topology.
-- **Risk-aware** — deterministic sector engines for construction, agriculture, and industrial facilities plus configurable alerts.
+- **Real hardware first** — BCRobotics Weather HAT PRO, optional Sense HAT, Enviro+, UV, Modbus/RS485, Hailo AI HAT+, and Google Coral USB Accelerator support.
+- **Edge resilient** — local MQTT, InfluxDB, SQLite buffering, Docker Compose deployment, optional three-node Pi cluster topology, and a dedicated Pi Zero 2WH variant.
+- **Risk-aware** — deterministic sector engines for construction, agriculture, industrial, residential, marine, aviation, energy, and transportation plus configurable alerts. All engines optionally support UK regional climate profiles for locally-tuned thresholds.
 - **Private by design** — third-party API keys stay in the FastAPI backend; the Dash frontend never receives weather or AI credentials.
-- **AI optional, local by default** — Hailo-8L NPU classification and local Ollama/Gemma guidance can run without internet access.
-- **Operations-ready** — CI, CodeQL, security policy, support policy, release policy, governance policy, and privacy guidance are included.
+- **AI optional, local by default** — Hailo-8L NPU or Google Coral Edge TPU classification and local Ollama/Gemma guidance can run without internet access.
+- **Operations-ready** — CI, CodeQL, CLI (`zedd`), email reporting, security policy, support policy, release policy, governance policy, and privacy guidance are included.
 
 ## Table of contents
 
@@ -27,9 +28,11 @@
 - [Repository map](#repository-map)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
+- [CLI reference](#cli-reference)
 - [Feature guide](#feature-guide)
 - [REST API](#rest-api)
 - [Deployment patterns](#deployment-patterns)
+- [Pi Zero 2WH variant](#pi-zero-2wh-variant)
 - [Development](#development)
 - [Testing and CI](#testing-and-ci)
 - [Security and operations](#security-and-operations)
@@ -44,28 +47,32 @@ Zedd Weather is a pure Python stack:
 |---|---|---|
 | Frontend | Dash + Plotly | Operator dashboard on port `8050` |
 | Backend | FastAPI | Weather proxy, AI endpoints, telemetry ingest, risk analysis on port `8000` |
+| CLI | `zedd` (argparse) | Batch, single-sector, sovereign protocol, and email-report commands |
 | Messaging | Mosquitto MQTT | Node-to-node telemetry and alert transport |
 | Storage | InfluxDB + SQLite buffer | Time-series persistence and edge outage resilience |
-| AI | Hailo-8L NPU + Ollama/Gemma | Local classification and natural-language mitigation guidance |
+| AI | Hailo-8L NPU / Google Coral TPU + Ollama/Gemma | Local classification and natural-language mitigation guidance |
+| Reporting | SMTP (email) | Scheduled or on-demand multi-sector HTML reports |
 | Packaging | Docker Compose + multi-arch Dockerfile | Single-host development and Raspberry Pi cluster deployment |
 | PiNet | `public/dapp.json` | Python DApp manifest for PiNet deployments |
 
 ## Hardware profile
 
-The reference deployment is a Raspberry Pi 5 cluster. The sensory worker is expected to run on a Pi with the BCRobotics Weather HAT PRO attached.
+The reference deployment is a Raspberry Pi cluster. The sensory worker is expected to run on a Pi with the BCRobotics Weather HAT PRO attached. For constrained environments a Pi Zero 2WH variant swaps the Hailo HAT for a Google Coral USB Accelerator.
 
 | Component | Required | Role |
-|---|---:|---|
+|---|---|---|
 | BCRobotics Weather HAT PRO | Yes | BME280 temperature/pressure/humidity plus RJ12 wind and rain instruments |
-| Raspberry Pi 4/5 | Yes | Edge node runtime; Pi 5 recommended for cluster deployments |
-| Hailo AI HAT+ / Hailo-8L | Optional | On-device weather classification and diagnostics |
+| Raspberry Pi 4/5 | Yes (standard) | Edge node runtime; Pi 5 recommended for cluster deployments |
+| Raspberry Pi Zero 2WH | Alternative | Ultra-low-cost edge for the Pi Zero variant (512 MB RAM, WiFi, no SSD) |
+| Hailo AI HAT+ / Hailo-8L | Optional | On-device weather classification and diagnostics (standard build) |
+| Google Coral USB Accelerator | Optional | Edge TPU classification (Pi Zero variant) |
 | M.2 NVMe SSD | Optional | Fast local buffer and model artefact storage |
 | Sense HAT v2 | Optional | Secondary environmental data, IMU, and LED matrix |
 | Pimoroni Enviro+ | Optional | Air-quality and particulate readings |
 | Adafruit VEML6075 | Optional | UV index, UVA, and UVB readings |
 | RS485/CAN HAT + Modbus sensors | Optional | Industrial wind and rain instruments |
 
-Every optional peripheral is controlled by environment variables in `.env.example` and `.env.production.example`.
+Every optional peripheral is controlled by environment variables in `.env.example` and `.env.production.example`. The Pi Zero variant disables all HATs that conflict with the Weather HAT PRO or require PCIe/NVMe.
 
 ## Architecture
 
@@ -75,23 +82,23 @@ Every optional peripheral is controlled by environment variables in `.env.exampl
 | BCRobotics Weather HAT PRO + optional Sense HAT/Enviro+/UV/Modbus   |
 | SensorManager.read_all() -> GPIO alarm/LED state -> MQTT publish    |
 +------------------------------------+-------------------------------+
-                                     |
-                                     v
+                                      |
+                                      v
 +--------------------------------------------------------------------+
 | MQTT broker                                                         |
 | Authenticated Mosquitto topic exchange for telemetry and alerts      |
 +------------------------------------+-------------------------------+
-                                     |
-                                     v
+                                      |
+                                      v
 +--------------------------------------------------------------------+
 | Node B - AI worker                                                   |
-| MQTT subscriber -> Hailo classifier -> Ollama/Gemma guidance         |
+| MQTT subscriber -> Hailo/Coral classifier -> Ollama/Gemma guidance   |
 | -> enriched telemetry and recommendations                            |
 +------------------------------------+-------------------------------+
-                                     |
-                                     v
+                                      |
+                                      v
 +--------------------------------------------------------------------+
-| Node A - Control plane                                               |
+| Node A - Control plane (or remote server for Pi Zero variant)        |
 | FastAPI REST API + Dash dashboard + InfluxDB + Grafana + Open WebUI  |
 | Browser -> Dash -> FastAPI -> storage, risk engines, weather proxy   |
 +--------------------------------------------------------------------+
@@ -112,23 +119,38 @@ Design principles:
 ├── Zweather/
 │   ├── dashboard/                  # Dash + Plotly frontend
 │   ├── api.py                      # FastAPI backend
-│   ├── app.py                      # Standalone edge collector with SQLite buffering
+│   ├── app.py                      # Standard edge collector (Sense HAT, InfluxDB)
+│   ├── app_pizero.py               # Pi Zero 2WH edge collector (Weather HAT PRO, Coral, MQTT)
+│   ├── cli.py                      # CLI: analyze, batch, list, sovereign, report
 │   ├── weather_client.py           # Server-side Google Weather API client
 │   ├── ai_client.py                # Server-side Ollama/Gemma client
+│   ├── utils.py                    # Shared helpers (dew point, fog risk, heat index, wind chill)
+│   ├── pizero/                     # Pi Zero 2WH variant config, Coral TPU drivers, inference
 │   ├── node1_telemetry/            # Sensory worker, sensor drivers, GPIO alarm control
 │   ├── node2_orchestration/        # AI worker and MQTT orchestration
-│   ├── ollama_inference/           # Hailo NPU and local AI clients
-│   ├── construction/               # Construction risk engine
+│   ├── ollama_inference/           # Hailo NPU / Coral TPU and local AI clients
+│   ├── global_regions/             # Shared UK region profiles and threshold adjustments
+│   ├── construction/               # Construction risk engine (uses global_regions)
 │   ├── agricultural/               # Agricultural risk engine and forecasting
-│   ├── industrial/                 # Industrial risk engine
+│   ├── industrial/                 # Industrial risk engine (uses global_regions)
+│   ├── residential/                # Residential property risk engine (uses global_regions)
+│   ├── marine/                     # Maritime and offshore risk engine (uses global_regions)
+│   ├── aviation/                   # Aviation risk engine (runway, flight, icing)
+│   ├── energy/                     # Energy risk engine (grid stability, generation)
+│   ├── transportation/             # Transportation risk engine (route, logistics)
+│   ├── reporting/                  # Email report builder (SMTP)
 │   ├── alerting/                   # Rules engine and notification channels
+│   ├── sovereign/                  # RMPE-2 sovereign weather protocol
 │   ├── requirements.txt            # Python dependencies
+│   ├── requirements.pizero.txt     # Pi Zero variant dependencies (minimal)
 │   └── tests/                      # Pytest suite
 ├── docker-compose.yml              # Local control plane and core services
 ├── docker-compose.cluster.yml      # Node B / Node C cluster overlay
 ├── Dockerfile                      # Multi-stage amd64/arm64 image
+├── Dockerfile.pizero               # Pi Zero 2WH single-stage arm64 image
 ├── mosquitto/                      # Authenticated MQTT broker configuration
 ├── public/dapp.json                # PiNet DApp manifest
+├── scripts/                        # Utility scripts (Coral model download)
 ├── .env.example                    # Local environment template
 ├── .env.production.example         # Production/cluster environment template
 ├── .github/workflows/              # CI, build, and CodeQL workflows
@@ -150,6 +172,7 @@ Design principles:
 - Git
 - Optional: Raspberry Pi hardware and attached sensors for real telemetry
 - Optional: local Ollama server with `gemma2:2b` for AI guidance
+- Optional: Google Coral USB Accelerator (Pi Zero variant)
 
 ### 2. Configure the environment
 
@@ -168,6 +191,7 @@ Set at least the values your deployment needs:
 | `OLLAMA_BASE_URL` | AI narrative endpoints | Defaults to local/host Ollama patterns |
 | `OLLAMA_MODEL` | AI narrative endpoints | Defaults to `gemma2:2b` |
 | `MQTT_BROKER_HOST` / `MQTT_BROKER_PORT` | Cluster workers | Used by sensory and AI workers |
+| `SMTP_HOST` / `SMTP_TO` | Email reporting | SMTP server and recipient list |
 
 ### 3. Start the local control plane
 
@@ -199,6 +223,11 @@ uvicorn Zweather.api:app --host 0.0.0.0 --port 8000
 
 # Terminal 2 - dashboard
 python -m Zweather.dashboard.app
+
+# Terminal 3 - CLI example
+python -m Zweather.cli analyze construction \
+  --temperature 18 --humidity 72 --pressure 1008 \
+  --region glasgow --season winter --output summary
 ```
 
 ### 5. Smoke-test telemetry ingest
@@ -229,6 +258,7 @@ The complete configuration surface lives in `.env.example` and `.env.production.
 | `WEATHER_HAT_PRO_ENABLED` | `true` | Enable the primary BCRobotics Weather HAT PRO driver |
 | `SENSE_HAT_ENABLED` | `false` | Enable Sense HAT readings and LED matrix support |
 | `AI_HAT_ENABLED` | `true` | Enable Hailo AI HAT+ diagnostics/classification |
+| `CORAL_ENABLED` | `true` (Pi Zero) | Enable Google Coral USB Accelerator |
 | `ENVIRO_PLUS_ENABLED` | `false` | Enable Pimoroni Enviro+ air-quality readings |
 | `UV_SENSOR_ENABLED` | `false` | Enable VEML6075 UV readings |
 | `MODBUS_ENABLED` | `false` | Enable RS485/Modbus industrial sensors |
@@ -270,6 +300,92 @@ The complete configuration surface lives in `.env.example` and `.env.production.
 | `MQTT_TOPIC` | `weather_station/telemetry` | Telemetry topic |
 | `PUBLISH_INTERVAL` | `10.0` | Sensor polling interval in seconds |
 
+### Email reporting
+
+| Variable | Default | Description |
+|---|---|---|
+| `SMTP_HOST` | `localhost` | SMTP server |
+| `SMTP_PORT` | `587` | SMTP port |
+| `SMTP_USER` | — | SMTP username |
+| `SMTP_PASSWORD` | — | SMTP password |
+| `SMTP_FROM` | `zedd-weather@localhost` | Sender address |
+| `SMTP_TO` | — | Comma-separated recipient list |
+
+## CLI reference
+
+The `zedd` CLI provides five subcommands:
+
+```text
+usage: zedd [-h] {analyze,list,batch,sovereign,report} ...
+
+Zedd Weather — multi-sector weather risk analysis CLI
+```
+
+### `zedd analyze`
+
+Run single-sector risk analysis:
+
+```bash
+# Basic usage
+zedd analyze construction --temperature 20 --humidity 60 --pressure 1013
+
+# All options
+zedd analyze marine \
+  --temperature 15 --humidity 80 --pressure 1008 \
+  --wind-speed 10 --precipitation 60 \
+  --uv-index 3 --aqi 50 \
+  --region glasgow --season winter \
+  --activity fishing \
+  --output summary
+```
+
+### `zedd list`
+
+List available sectors:
+
+```bash
+zedd list
+```
+
+### `zedd batch`
+
+Analyze all (or selected) sectors at once:
+
+```bash
+zedd batch --temperature 18 --humidity 65 --pressure 1015
+zedd batch --temperature 18 --humidity 65 --pressure 1015 \
+  --sectors construction marine energy
+```
+
+### `zedd sovereign`
+
+Compose or validate RMPE-2 sovereign weather transitions:
+
+```bash
+# Compose a new weather coin transition
+zedd sovereign compose \
+  --temperature 20 --humidity 60 --pressure 1013 \
+  --station-id my-node
+
+# Validate a transition from stdin
+cat transition.json | zedd sovereign validate
+```
+
+### `zedd report`
+
+Send an HTML email report for one or all sectors:
+
+```bash
+# Report on all 8 sectors
+zedd report --temperature 20 --humidity 60 --pressure 1013
+
+# Report on a single sector
+zedd report --temperature 20 --humidity 60 --pressure 1013 \
+  --sector energy --region london --season summer
+```
+
+Requires SMTP environment variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_TO`, `SMTP_FROM`).
+
 ## Feature guide
 
 ### Sensor ingestion
@@ -284,13 +400,20 @@ Each loop reads enabled sensors, evaluates GPIO alarms, updates the optional LED
 
 ### Risk engines
 
+All engines are deterministic, require no AI provider, and optionally accept a UK region (e.g. `"glasgow"`, `"london"`) and season for locally-adjusted thresholds. Common threshold logic is shared via `Zweather/global_regions/`.
+
 | Sector | Package | Coverage |
 |---|---|---|
-| Construction | `Zweather/construction/` | concrete pouring, crane operations, excavation, roofing, painting, masonry, general construction |
-| Agricultural | `Zweather/agricultural/` | crop profiles and seven-day risk forecasting |
-| Industrial | `Zweather/industrial/` | manufacturing, power plant, chemical, warehouse, refinery, general industrial operations |
+| Construction | `Zweather/construction/` | concrete pouring, crane operations, excavation, roofing, scaffolding, steel erection, demolition, ground works, facade works, general construction |
+| Agricultural | `Zweather/agricultural/` | crop profiles (maize, wheat, tomato, rice, potato) and seven-day risk forecasting |
+| Industrial | `Zweather/industrial/` | manufacturing, power plant, chemical, warehouse, refinery, general industrial; wind-gust, visibility, and material-risk detection |
+| Residential | `Zweather/residential/` | property types (Victorian terrace, modern detached, modern flat, postwar semi, interwar bungalow); building fabric, occupant safety, energy demand, and property hazard assessment |
+| Marine | `Zweather/marine/` | vessel types (container ship, fishing vessel, passenger ferry, offshore supply, pleasure craft); Beaufort sea state, icing risk, stability, deck/cargo safety, swell, and fog |
+| Aviation | `Zweather/aviation/` | aircraft profiles (commercial jet, regional turboprop, cargo, private, helicopter, military); runway condition, flight risk (gust, wind-shear, visibility, thunderstorm), and icing assessment |
+| Energy | `Zweather/energy/` | asset types (solar farm, wind farm, substation, hydro plant, combined-cycle gas turbine, battery storage); grid stability, generation forecasting with solar/wind power curves, and energy hazard detection |
+| Transportation | `Zweather/transportation/` | transport modes (road, rail, light rail, ferry, freight); route conditions (surface, fog, flood), logistics risk (black-ice, track buckling, heat, AQI), and travel advisories |
 
-The engines are deterministic and do not require an AI provider. They return risk scores, breached rules, and recommended mitigations.
+Engines return risk scores, breached rules, and recommended mitigations.
 
 ### Alerting
 
@@ -301,8 +424,21 @@ The engines are deterministic and do not require an AI provider. They return ris
 
 ### On-device and local AI
 
-- `Zweather/ollama_inference/hailo_npu.py` loads a Hailo HEF model when the runtime is available and falls back to deterministic classification based on real readings when it is not.
-- `Zweather/ollama_inference/client.py` and `Zweather/ai_client.py` call local Ollama/Gemma endpoints for operator guidance.
+- **Hailo-8L NPU** (`Zweather/ollama_inference/hailo_npu.py`) — loads a Hailo HEF model when the runtime is available and falls back to deterministic classification.
+- **Google Coral TPU** (`Zweather/pizero/coral_tpu_driver.py` and `coral_npu_client.py`) — loads a TFLite model for the Edge TPU on the Pi Zero variant; same deterministic fallback.
+- **Ollama/Gemma** (`Zweather/ollama_inference/client.py` and `Zweather/ai_client.py`) — local LLM endpoints for operator guidance across all 8 sectors.
+
+### Email reporting
+
+`Zweather/reporting/email_reporter.py` sends dark-themed HTML multi-sector reports via SMTP:
+
+```python
+from Zweather.reporting import send_report
+
+send_report(results, region="Midlands")
+```
+
+Can be triggered via the CLI (`zedd report`) or REST API (`POST /api/report`).
 
 ### Dashboard
 
@@ -310,7 +446,7 @@ The engines are deterministic and do not require an AI provider. They return ris
 
 1. Live telemetry and rolling charts
 2. Forecasts and AI forecast narrative
-3. Sector risk analysis
+3. Sector risk analysis (all 8 sectors with region/season selectors)
 4. Site map/logistics guidance
 
 The dashboard talks to the FastAPI backend only; it does not hold third-party API keys.
@@ -324,13 +460,14 @@ Interactive OpenAPI docs are available at <http://localhost:8000/docs> when the 
 | `GET` | `/api/health` | Service health check |
 | `POST` | `/api/telemetry/ingest` | Store a sensor snapshot |
 | `GET` | `/api/telemetry/latest` | Return the latest ingested snapshot |
-| `POST` | `/api/analyze` | Run sector risk analysis |
+| `POST` | `/api/analyze` | Run sector risk analysis (all 8 sectors) |
 | `POST` | `/api/alerts` | Evaluate alert rules |
+| `POST` | `/api/report` | Run heuristic analysis and email the report |
 | `GET` | `/api/weather/current` | Current weather through server-side Google Weather proxy |
 | `GET` | `/api/weather/forecast` | Multi-day forecast through server-side Google Weather proxy |
 | `GET` | `/api/weather/history` | Historical weather through server-side Google Weather proxy |
-| `POST` | `/api/ai/risk` | AI risk narrative |
-| `POST` | `/api/ai/forecast` | AI forecast narrative |
+| `POST` | `/api/ai/risk` | AI risk narrative (all 8 sectors) |
+| `POST` | `/api/ai/forecast` | AI forecast narrative (all 8 sectors) |
 | `POST` | `/api/ai/sitemap` | Site logistics guidance |
 | `GET` | `/api/sovereign/protocol` | Sovereign protocol description, including RMP/RNPE-2 metadata |
 | `POST` | `/api/sovereign/compose` | Compose a deterministic weather-state transition |
@@ -360,7 +497,7 @@ docker logs -f zedd-ai-worker
 | Node | Role | Main services |
 |---|---|---|
 | Node A | Control plane and storage | FastAPI, Dash, InfluxDB, Grafana, Open WebUI, shared MQTT broker |
-| Node B | AI worker | MQTT subscriber, Hailo NPU classifier, local Ollama guidance |
+| Node B | AI worker | MQTT subscriber, Hailo/Coral classifier, local Ollama guidance |
 | Node C | Sensory worker | Weather HAT PRO and optional peripherals, alarm GPIO, MQTT publisher |
 
 Recommended flow:
@@ -374,17 +511,67 @@ Recommended flow:
 
 `public/dapp.json` declares the Python DApp entry point as `Zweather/dashboard/app.py` and lists required PiNet permissions for wallet, RPC, notifications, system/cluster reads, sensors, and NPU access.
 
+## Pi Zero 2WH variant
+
+For ultra-low-cost edge deployments the repository includes a dedicated Raspberry Pi Zero 2WH variant that replaces the Hailo-8L AI HAT+ (requires PCIe) with a Google Coral USB Accelerator (Edge TPU via USB).
+
+### Key differences
+
+| Aspect | Standard build | Pi Zero 2WH variant |
+|---|---|---|
+| Board | Raspberry Pi 4/5 | Raspberry Pi Zero 2WH (quad Cortex-A53@1GHz, 512MB RAM) |
+| AI accelerator | Hailo-8L NPU (PCIe M.2) | Google Coral Edge TPU (USB) |
+| Model format | `.hef` (Hailo Executable Format) | `.tflite` (TensorFlow Lite) |
+| Storage | NVMe SSD optional | tmpfs only — no SSD, no SD card writes |
+| InfluxDB | Local or remote | Remote only (disabled when `INFLUXDB_URL` empty) |
+| Control plane | Local | Remote server |
+| Sensors | Sense HAT + Weather HAT PRO | Weather HAT PRO only (Sense HAT conflicts physically) |
+| Container | `Dockerfile` | `Dockerfile.pizero` |
+| Entry point | `python -m Zweather.app` | `python -m Zweather.app_pizero` |
+| Dependencies | `requirements.txt` | `requirements.pizero.txt` (minimal) |
+
+### Getting started on Pi Zero
+
+```bash
+# 1. Flash Raspberry Pi OS Lite (64-bit) to microSD
+# 2. Install Coral dependencies
+echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" \
+  | sudo tee /etc/apt/sources.list.d/coral-edgetpu.list
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+sudo apt-get update && sudo apt-get install -y python3-tflite-runtime python3-pycoral
+
+# 3. Clone and install
+git clone https://github.com/WilliamMajanja/Zedd-Weather.git
+cd Zedd-Weather
+pip install -r Zweather/requirements.pizero.txt
+
+# 4. Download Coral model
+sudo ./scripts/download_coral_model.sh
+
+# 5. Configure and run
+export MQTT_BROKER_HOST=10.0.0.50  # remote broker
+export CORAL_ENABLED=true
+python -m Zweather.app_pizero
+```
+
+### Pi Zero buffer management
+
+All buffered data is stored in `/tmp/zedd_buffer.db` (tmpfs, RAM-backed) to avoid SD card wear. The buffer is flushed to MQTT on every successful publish and fully drained on a configurable interval (`BUFFER_FLUSH_INTERVAL`, default 300 seconds). Maximum buffered rows (`MAX_BUFFER_ROWS`, default 5000) prevents memory exhaustion.
+
 ## Development
 
 ```bash
 pip install -r Zweather/requirements.txt
-pip install pytest httpx flake8 mypy
+pip install pytest httpx flake8 mypy pytest-asyncio
 
 # API with reload
 uvicorn Zweather.api:app --reload --host 0.0.0.0 --port 8000
 
 # Dashboard
 python -m Zweather.dashboard.app
+
+# CLI dry-run
+python -m Zweather.cli list
 ```
 
 Contribution basics:
@@ -401,12 +588,15 @@ Local checks:
 
 ```bash
 flake8 Zweather/ --select=E9,F63,F7,F82 --show-source --statistics
-mypy Zweather/app.py Zweather/agricultural/engine.py Zweather/construction/engine.py Zweather/alerting/rules.py --ignore-missing-imports
+mypy Zweather/ --ignore-missing-imports
 pytest Zweather/tests/ -v --tb=short
 docker build .
+docker build -f Dockerfile.pizero .
 ```
 
 GitHub Actions runs Python linting, mypy, pytest, multi-arch Docker builds, and CodeQL security analysis.
+
+Current test coverage: **370+ tests** across 22 test files covering all 8 sector engines, CLI, API endpoints, email reporting, weather client, AI client, sovereign protocol, sensor drivers, and the Pi Zero variant.
 
 ## Security and operations
 
@@ -417,7 +607,7 @@ Security-sensitive defaults and deployment notes:
 - Restrict FastAPI CORS origins before exposing the API outside local development.
 - Keep Mosquitto on a private network and enable TLS for production MQTT traffic.
 - Avoid exposing Ollama, InfluxDB, Grafana, or hardware control ports directly to the public internet.
-- Mount Hailo HEF model files read-only and verify checksums before production deployment.
+- Mount Hailo HEF / Coral TFLite model files read-only and verify checksums before production deployment.
 - Use LUKS or equivalent encryption for NVMe telemetry storage when readings could identify sensitive site activity.
 - Review `SECURITY.md` and `PRIVACY.md` before production rollout.
 
@@ -430,10 +620,13 @@ Security-sensitive defaults and deployment notes:
 | `wind_direction_deg` missing | Wind-vane voltage is outside expected resistor ranges; check cable, ADC channel, and wiring. |
 | `rain_mm` never increments | Check rain-gauge cable, GPIO pin, and `WEATHER_HAT_PRO_RAIN_MM_PER_TIP`. |
 | `ai_hat_status: unavailable` | Hailo runtime or `/dev/hailo0` is missing; deterministic classification continues until hardware support is restored. |
+| `coral_available: False` | Coral runtime (`pycoral`/`tflite-runtime`) or `/dev/apex_0` is missing; heuristic fallback active. |
 | Dashboard shows no data | No payload has reached `/api/telemetry/ingest`; inspect sensory-worker and MQTT logs. |
 | Weather endpoints fail | Confirm `GOOGLE_WEATHER_API_KEY`, API quota, backend logs, and network access. |
 | AI narrative endpoints fail | Confirm `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, and that the model is pulled on the Ollama host. |
 | InfluxDB container exits | Required secrets may be missing; check `INFLUXDB_TOKEN`, `DOCKER_INFLUXDB_INIT_PASSWORD`, and Compose logs. |
+| Email reports not sent | Check `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_TO`. |
+| Pi Zero SD card wear | Ensure `SQLITE_DB_PATH` points to `/tmp/` (tmpfs) and no persistent logs are writing to the SD card. |
 
 ## Project policies
 

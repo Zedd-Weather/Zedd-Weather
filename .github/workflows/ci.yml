@@ -5,6 +5,7 @@ on:
     paths:
       - "Zweather/**"
       - "Dockerfile"
+      - "Dockerfile.pizero"
       - ".github/workflows/ci.yml"
   pull_request:
     branches:
@@ -44,8 +45,27 @@ jobs:
 
       - name: Mypy
         run: |
-          mypy Zweather/app.py Zweather/agricultural/engine.py Zweather/construction/engine.py Zweather/alerting/rules.py \
+          mypy \
+            Zweather/app.py Zweather/cli.py Zweather/api.py \
+            Zweather/reporting/email_reporter.py \
+            Zweather/weather_client.py Zweather/ai_client.py \
+            Zweather/sovereign/engine.py Zweather/sovereign/protocol.py \
+            Zweather/pizero/config.py Zweather/pizero/coral_npu_client.py Zweather/pizero/coral_tpu_driver.py \
+            Zweather/app_pizero.py \
+            Zweather/agricultural/engine.py Zweather/construction/engine.py \
+            Zweather/industrial/engine.py Zweather/residential/engine.py \
+            Zweather/marine/engine.py Zweather/aviation/engine.py \
+            Zweather/energy/engine.py Zweather/transportation/engine.py \
+            Zweather/alerting/rules.py Zweather/alerting/channels.py \
+            Zweather/global_regions/models.py Zweather/global_regions/regions.py \
+            Zweather/ollama_inference/client.py Zweather/ollama_inference/hailo_npu.py \
             --ignore-missing-imports
+
+      - name: Validate pizero requirements
+        run: |
+          pip install --no-cache-dir \
+            $(grep -v -E '^\s*(RPi\.GPIO|gpiozero)' Zweather/requirements.pizero.txt \
+              | grep -v '^\s*#' | grep -v '^\s*$')
 
   # ---------------------------------------------------------------------------
   # Python tests
@@ -117,6 +137,48 @@ jobs:
         with:
           context: .
           platforms: linux/arm64,linux/amd64
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # ---------------------------------------------------------------------------
+  # Docker build — Pi Zero 2WH variant (arm64 only)
+  # ---------------------------------------------------------------------------
+  build-docker-pizero:
+    runs-on: ubuntu-latest
+    needs: [lint-python]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/zedd-weather-pizero
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.pizero
+          platforms: linux/arm64
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

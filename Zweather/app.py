@@ -93,12 +93,6 @@ ZSCORE_THRESHOLD  = 4.0     # flag if > 4 standard deviations from the mean
 # Logging
 # ---------------------------------------------------------------------------
 
-logging.basicConfig(
-    stream=sys.stdout,
-    level=getattr(logging, LOG_LEVEL, logging.INFO),
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%SZ",
-)
 log = logging.getLogger("zedd.edge")
 
 # ---------------------------------------------------------------------------
@@ -155,7 +149,7 @@ def _db_cursor(conn: sqlite3.Connection) -> Generator[sqlite3.Cursor, None, None
     try:
         yield cur
         conn.commit()
-    except Exception:
+    except sqlite3.Error:
         conn.rollback()
         raise
     finally:
@@ -357,22 +351,23 @@ def touch_liveness() -> None:
 
 def _write_with_retry(
     reading: TelemetryReading,
+    influx_client: Optional[InfluxDBClient],
     write_api: WriteApi,
     db_conn: sqlite3.Connection,
     node_name: str,
     consecutive_failures: int,
     max_failures: int,
-) -> tuple[int, WriteApi]:
+) -> tuple[int, Optional[InfluxDBClient], WriteApi]:
     """
     Attempt to write a single reading to InfluxDB.
     On failure: buffer locally and potentially reconnect.
-    Returns (updated_failure_count, write_api).
+    Returns (updated_failure_count, influx_client, write_api).
     """
     try:
         try:
             flush_buffer(db_conn, write_api, node_name)
-        except Exception as flush_exc:
-            log.debug("Buffer flush failed: %s", flush_exc)
+        except (OSError, RuntimeError) as flush_exc:
+            log.warning("Buffer flush failed: %s", flush_exc)
 
         write_api.write(
             bucket=INFLUXDB_BUCKET,
@@ -386,7 +381,7 @@ def _write_with_retry(
             reading.pressure_hpa,
             "  [ANOMALY]" if reading.anomaly else "",
         )
-        return 0, write_api
+        return 0, influx_client, write_api
 
     except Exception as write_exc:
         consecutive_failures += 1
@@ -399,13 +394,18 @@ def _write_with_retry(
         if consecutive_failures >= max_failures:
             log.error("Too many consecutive failures – attempting to reconnect")
             try:
-                _, write_api = _build_write_api()
+                if influx_client is not None:
+                    try:
+                        influx_client.close()
+                    except (OSError, RuntimeError):
+                        log.debug("Failed to close old InfluxDB client during reconnect", exc_info=True)
+                influx_client, write_api = _build_write_api()
                 consecutive_failures = 0
                 log.info("Reconnected to InfluxDB")
-            except Exception as reconnect_exc:
+            except (OSError, RuntimeError) as reconnect_exc:
                 log.error("Reconnect failed: %s", reconnect_exc)
 
-        return consecutive_failures, write_api
+        return consecutive_failures, influx_client, write_api
 
 
 def run() -> None:
@@ -440,7 +440,7 @@ def run() -> None:
         try:
             influx_client, write_api = _build_write_api()
             log.info("Connected to InfluxDB at %s", INFLUXDB_URL)
-        except Exception as exc:
+        except (OSError, RuntimeError) as exc:
             log.warning("Initial InfluxDB connection failed: %s", exc)
     else:
         log.warning(
@@ -468,8 +468,8 @@ def run() -> None:
             reading = detector.validate(reading)
 
             if write_api is not None:
-                consecutive_failures, write_api = _write_with_retry(
-                    reading, write_api, db_conn, NODE_NAME,
+                consecutive_failures, influx_client, write_api = _write_with_retry(
+                    reading, influx_client, write_api, db_conn, NODE_NAME,
                     consecutive_failures, MAX_FAILURES,
                 )
             else:
@@ -491,11 +491,17 @@ def run() -> None:
     if influx_client:
         try:
             influx_client.close()
-        except Exception:
+        except (OSError, RuntimeError):
             log.debug("Failed to close InfluxDB client during shutdown", exc_info=True)
     db_conn.close()
     log.info("Edge collector stopped")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        stream=sys.stdout,
+        level=getattr(logging, LOG_LEVEL, logging.INFO),
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%SZ",
+    )
     run()

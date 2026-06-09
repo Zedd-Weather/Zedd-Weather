@@ -18,6 +18,9 @@ _DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
 _DEFAULT_MODEL = "gemma2:2b"
 _REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=45)
 
+_session: aiohttp.ClientSession | None = None
+_session_lock = asyncio.Lock()
+
 # Mirror of the frontend SECTOR_CONFIG so we can keep this module self-contained.
 SECTOR_CONFIG: dict[str, dict[str, str]] = {
     "construction": {
@@ -42,6 +45,47 @@ SECTOR_CONFIG: dict[str, dict[str, str]] = {
         "focusAreas": (
             "equipment safety, process risks, supply chain disruption, "
             "air quality, and worker exposure limits"
+        ),
+    },
+    "residential": {
+        "label": "Residential",
+        "description": "residential housing and communities",
+        "focusAreas": (
+            "building fabric integrity, occupant safety, energy demand, "
+            "flooding risk, and heat/cold stress on vulnerable residents"
+        ),
+    },
+    "marine": {
+        "label": "Marine",
+        "description": "a maritime or offshore operation",
+        "focusAreas": (
+            "vessel safety, sea state conditions, storm surge risk, "
+            "wave height, and crew evacuation planning"
+        ),
+    },
+    "aviation": {
+        "label": "Aviation",
+        "description": "an airport or flight operation",
+        "focusAreas": (
+            "runway conditions, crosswind limits, icing risk, "
+            "visibility restrictions, and flight safety hazards"
+        ),
+    },
+    "energy": {
+        "label": "Energy",
+        "description": "an energy generation or grid facility",
+        "focusAreas": (
+            "grid stability under demand spikes, renewable generation "
+            "forecasting, overheating/freezing of equipment, "
+            "and supply disruption risks"
+        ),
+    },
+    "transportation": {
+        "label": "Transportation",
+        "description": "a transport or logistics network",
+        "focusAreas": (
+            "route safety, black ice detection, fog-related disruption, "
+            "heat-related track buckling, and logistics chain delays"
         ),
     },
 }
@@ -79,6 +123,14 @@ def _normalize_risk_level(level: Any) -> str:
     return text if text in allowed else "Amber"
 
 
+async def _get_session() -> aiohttp.ClientSession:
+    global _session
+    async with _session_lock:
+        if _session is None or _session.closed:
+            _session = aiohttp.ClientSession(timeout=_REQUEST_TIMEOUT)
+    return _session
+
+
 async def _generate_text(prompt: str) -> str:
     payload = {
         "model": _ollama_model(),
@@ -88,11 +140,11 @@ async def _generate_text(prompt: str) -> str:
     }
     url = f"{_ollama_base_url()}/api/generate"
     try:
-        async with aiohttp.ClientSession(timeout=_REQUEST_TIMEOUT) as session:
-            async with session.post(url, json=payload) as response:
-                response.raise_for_status()
-                data = await response.json()
-                return str(data.get("response", "")).strip()
+        session = await _get_session()
+        async with session.post(url, json=payload) as response:
+            response.raise_for_status()
+            data = await response.json()
+            return str(data.get("response", "")).strip()
     except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
         raise RuntimeError(
             f"Local Ollama request failed at {url}. "
@@ -111,7 +163,8 @@ async def analyze_risk(
     telemetry:
         Dict with keys: temp, humidity, pressure, precipitation, uvIndex, aqi, tide.
     sector:
-        One of ``construction``, ``agricultural``, ``industrial``.
+        One of ``construction``, ``agricultural``, ``industrial``, ``residential``,
+        ``marine``, ``aviation``, ``energy``, ``transportation``.
 
     Returns
     -------
@@ -157,7 +210,8 @@ async def analyze_forecast(
     forecast_data:
         List of ForecastDay dicts (date, tempMax, tempMin, precip, wind, uv).
     sector:
-        One of ``construction``, ``agricultural``, ``industrial``.
+        One of ``construction``, ``agricultural``, ``industrial``, ``residential``,
+        ``marine``, ``aviation``, ``energy``, ``transportation``.
 
     Returns
     -------

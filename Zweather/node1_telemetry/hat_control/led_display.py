@@ -54,13 +54,19 @@ class LEDDisplay:
         """Fill the entire 8×8 matrix with a single colour."""
         if not self.available:
             return
-        self._hat.set_pixels([colour] * 64)
+        try:
+            self._hat.set_pixels([colour] * 64)
+        except (OSError, RuntimeError) as exc:
+            logger.debug("LED fill failed: %s", exc)
 
     def clear(self) -> None:
         """Turn off all LEDs."""
         if not self.available:
             return
-        self._hat.clear_display()
+        try:
+            self._hat.clear_display()
+        except (OSError, RuntimeError) as exc:
+            logger.debug("LED clear failed: %s", exc)
 
     def show_risk_level(self, level: str) -> None:
         """Fill the matrix with the colour matching a risk level string.
@@ -82,11 +88,14 @@ class LEDDisplay:
         """Scroll *text* across the LED matrix."""
         if not self.available:
             return
-        self._hat.show_message(
-            text,
-            scroll_speed=speed,
-            text_colour=colour or WHITE,
-        )
+        try:
+            self._hat.show_message(
+                text,
+                scroll_speed=speed,
+                text_colour=colour or WHITE,
+            )
+        except (OSError, RuntimeError) as exc:
+            logger.debug("LED scroll_message failed: %s", exc)
 
     # ------------------------------------------------------------------
     # Bar-graph indicator
@@ -103,12 +112,14 @@ class LEDDisplay:
         clamped = max(min_val, min(value, max_val))
         frac = (clamped - min_val) / (max_val - min_val) if max_val != min_val else 0
         filled_rows = round(frac * 8)
-
-        pixels = [BLACK] * 64
-        for row in range(8 - filled_rows, 8):
-            for col in range(8):
-                pixels[row * 8 + col] = bar_colour
-        self._hat.set_pixels(pixels)
+        try:
+            pixels = [BLACK] * 64
+            for row in range(8 - filled_rows, 8):
+                for col in range(8):
+                    pixels[row * 8 + col] = bar_colour
+            self._hat.set_pixels(pixels)
+        except (OSError, RuntimeError) as exc:
+            logger.debug("LED show_bar failed: %s", exc)
 
     # ------------------------------------------------------------------
     # Custom icon
@@ -126,4 +137,7 @@ class LEDDisplay:
         if len(icon) != 64:
             logger.warning("Icon must contain exactly 64 pixels.")
             return
-        self._hat.set_pixels(icon)
+        try:
+            self._hat.set_pixels(icon)
+        except (OSError, RuntimeError) as exc:
+            logger.debug("LED show_icon failed: %s", exc)

@@ -80,8 +80,12 @@ class ModbusSensors(BaseSensor):
                 slave=config.MODBUS_ANEMOMETER_UNIT_ID,
             )
             if not result.isError():
-                data["wind_speed_ms"] = round(result.registers[0] / 10.0, 1)
-                data["wind_direction_deg"] = result.registers[1]
+                regs = result.registers
+                if len(regs) >= 2:
+                    data["wind_speed_ms"] = round(regs[0] / 10.0, 1)
+                    data["wind_direction_deg"] = regs[1]
+                else:
+                    logger.warning("Anemometer returned %d registers, expected 2", len(regs))
             else:
                 logger.warning("Anemometer Modbus read error: %s", result)
         except Exception as exc:
@@ -95,7 +99,11 @@ class ModbusSensors(BaseSensor):
                 slave=config.MODBUS_RAIN_GAUGE_UNIT_ID,
             )
             if not result.isError():
-                data["modbus_rain_total_mm"] = round(result.registers[0] / 10.0, 1)
+                regs = result.registers
+                if len(regs) >= 1:
+                    data["modbus_rain_total_mm"] = round(regs[0] / 10.0, 1)
+                else:
+                    logger.warning("Rain gauge returned empty register list")
             else:
                 logger.warning("Rain gauge Modbus read error: %s", result)
         except Exception as exc:
@@ -110,5 +118,5 @@ class ModbusSensors(BaseSensor):
         if self._client is not None:
             try:
                 self._client.close()
-            except Exception:
+            except (OSError, RuntimeError):
                 logger.debug("Modbus client cleanup failed", exc_info=True)

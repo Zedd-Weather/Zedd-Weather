@@ -19,7 +19,7 @@ import os
 # ---------------------------------------------------------------------------
 # MQTT
 # ---------------------------------------------------------------------------
-MQTT_BROKER = os.getenv("MQTT_BROKER_HOST", "10.0.0.16")
+MQTT_BROKER = os.getenv("MQTT_BROKER_HOST", "127.0.0.1")
 MQTT_PORT = int(os.getenv("MQTT_BROKER_PORT", "1883"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "zedd/telemetry/node1")
 MQTT_CLIENT_ID = "node1_telemetry"
@@ -111,6 +111,34 @@ WEATHER_HAT_PRO_RAIN_MM_PER_TIP = float(
 WEATHER_HAT_PRO_VANE_ADC_CHANNEL = int(
     os.getenv("WEATHER_HAT_PRO_VANE_ADC_CHANNEL", "0")
 )
+
+# ---------------------------------------------------------------------------
+# BC Robotics 16-Channel Analog Input HAT (SPI ADC)
+# ---------------------------------------------------------------------------
+BC_ROBOTICS_ADC_ENABLED = (
+    os.getenv("BC_ROBOTICS_ADC_ENABLED", "false").lower() == "true"
+)
+# ADC chip type: "MCP3008" (10-bit, default) or "MCP3208" (12-bit)
+BC_ROBOTICS_ADC_CHIP_TYPE = os.getenv(
+    "BC_ROBOTICS_ADC_CHIP_TYPE", "MCP3008"
+)
+# SPI bus and reference voltage (Volts)
+BC_ROBOTICS_ADC_SPI_BUS = int(os.getenv("BC_ROBOTICS_ADC_SPI_BUS", "0"))
+BC_ROBOTICS_ADC_VREF = float(os.getenv("BC_ROBOTICS_ADC_VREF", "3.3"))
+
+# ---------------------------------------------------------------------------
+# Gravity Analog Capacitive Soil Moisture Sensor (via BC Robotics ADC)
+# ---------------------------------------------------------------------------
+SOIL_MOISTURE_ENABLED = (
+    os.getenv("SOIL_MOISTURE_ENABLED", "false").lower() == "true"
+)
+# ADC channel the sensor is wired to (0–15)
+SOIL_MOISTURE_ADC_CHANNEL = int(
+    os.getenv("SOIL_MOISTURE_ADC_CHANNEL", "0")
+)
+# Calibration voltages: measured when sensor is dry vs fully wet
+SOIL_MOISTURE_DRY_V = float(os.getenv("SOIL_MOISTURE_DRY_V", "2.5"))
+SOIL_MOISTURE_WET_V = float(os.getenv("SOIL_MOISTURE_WET_V", "1.0"))
 
 # ---------------------------------------------------------------------------
 # Modbus / RS485 – Industrial Sensors (via Waveshare RS485 CAN HAT)

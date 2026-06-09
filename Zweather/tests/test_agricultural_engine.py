@@ -73,6 +73,14 @@ class TestAgriculturalEngine:
         result = self.engine.weather_stress_analysis(self.normal_telemetry, "wheat")
         assert isinstance(result, dict)
 
+    def test_analyze_with_region(self):
+        result = self.engine.analyze(self.normal_telemetry, region="glasgow")
+        assert result.get("region") == "West Scotland (Glasgow)"
+
+    def test_analyze_with_season(self):
+        result = self.engine.analyze(self.normal_telemetry, season="winter")
+        assert result.get("season") == "winter"
+
     def test_missing_telemetry_keys(self):
         """Engine should handle missing keys gracefully."""
         partial = {"temperature": 20.0}

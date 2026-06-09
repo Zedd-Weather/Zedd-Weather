@@ -1,0 +1,45 @@
+# Zedd Weather — Raspberry Pi Zero 2WH Dependencies
+# Minimal set — only what runs ON the Pi Zero itself.
+# Heavy services (InfluxDB, Grafana, Ollama) run on a separate server.
+#
+# Install with:
+#   pip install -r Zweather/requirements.pizero.txt
+
+# ── SPI (BC Robotics 16CH ADC HAT) ───────────────────────────────────────
+spidev>=3.6; platform_machine == "aarch64" or platform_machine == "armv7l"
+
+# ── MQTT (edge → remote broker) ──────────────────────────────────────────
+paho-mqtt>=1.6.1,<2.0
+
+# ── Weather HAT PRO (primary sensor) ────────────────────────────────────
+# BCRobotics Weather HAT PRO: BME280 + wind/rain/vane
+smbus2>=0.4.3
+RPi.GPIO>=0.7.1; platform_machine == "aarch64" or platform_machine == "armv7l"
+gpiozero>=2.0; platform_machine == "aarch64" or platform_machine == "armv7l"
+
+# ── Google Coral Edge TPU ───────────────────────────────────────────────
+# tflite-runtime is sufficient for inference; pycoral adds the Edge TPU
+# delegate.  Install via Google's coral repo:
+#   echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" \
+#     | sudo tee /etc/apt/sources.list.d/coral-edgetpu.list
+#   curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+#   sudo apt-get update && sudo apt-get install python3-tflite-runtime python3-pycoral
+#
+# pip fallback (arm64 wheels are available on PyPI but may lack Edge TPU support):
+tflite-runtime>=2.14.0; platform_machine == "aarch64" or platform_machine == "armv7l"
+
+# ── NumPy (required for Coral / tflite feature vectors) ──────────────────
+numpy>=1.26.0
+
+# ── No InfluxDB, no Grafana, no Ollama, no FastAPI, no Dash on Pi Zero ──
+# Those run on the remote server.
+#
+# The following are deliberately excluded:
+#   - influxdb-client
+#   - fastapi / uvicorn
+#   - dash / plotly / dash-bootstrap-components
+#   - aiohttp
+#   - hailort
+#   - sense-hat
+#   - enviroplus / pimoroni-bme280 / pimoroni-ltr559 / pms5003
+#   - pymodbus / pyserial

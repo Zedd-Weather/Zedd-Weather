@@ -64,7 +64,7 @@ docker compose up -d      # Start control plane + storage services
 - Follow [PEP 8](https://peps.python.org/pep-0008/) style.
 - Use type hints where practical.
 - Run `flake8` and `mypy` before submitting.
-- Place sector engines in their own package (e.g. `Zweather/construction/`), Dash UI in `Zweather/dashboard/`, and tests in `Zweather/tests/`.
+- Place sector engines in their own package (e.g. `Zweather/industrial/`), shared logic in `Zweather/global_regions/`, Dash UI in `Zweather/dashboard/`, and tests in `Zweather/tests/`.
 
 ### Commits
 

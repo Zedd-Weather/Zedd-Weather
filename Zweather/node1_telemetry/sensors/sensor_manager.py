@@ -21,6 +21,8 @@ from Zweather.node1_telemetry.sensors.uv_sensor import UVSensor
 from Zweather.node1_telemetry.sensors.enviro_plus import EnviroPlusSensor
 from Zweather.node1_telemetry.sensors.weather_hat_pro import WeatherHatProDriver
 from Zweather.node1_telemetry.sensors.modbus_sensors import ModbusSensors
+from Zweather.node1_telemetry.sensors.bc_robotics_adc import BCRobotics16CHADC
+from Zweather.node1_telemetry.sensors.soil_moisture import SoilMoistureSensor
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +31,11 @@ class SensorManager:
     """Facade that aggregates all registered sensor drivers."""
 
     def __init__(self):
-        self._drivers = []
+        self._drivers: list = []
         self._sense_hat: SenseHatDriver | None = None
         self._ai_hat: AIHatDriver | None = None
+        self._bc_adc: BCRobotics16CHADC | None = None
+        self._soil_moisture: SoilMoistureSensor | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -39,6 +43,17 @@ class SensorManager:
     def initialize(self) -> None:
         """Discover and initialise all enabled sensor drivers."""
         logger.info("Initialising sensor manager …")
+
+        # Warn about potential GPIO pin conflicts.
+        if (config.RAIN_GAUGE_ENABLED and config.WEATHER_HAT_PRO_ENABLED
+                and config.RAIN_GAUGE_GPIO_PIN == config.WEATHER_HAT_PRO_RAIN_GAUGE_GPIO_PIN):
+            logger.warning(
+                "GPIO pin %d is configured for both RainGaugeSensor and "
+                "WeatherHatProDriver rain gauge. Only the first driver to "
+                "claim it will succeed. Set RAIN_GAUGE_GPIO_PIN or "
+                "WEATHER_HAT_PRO_RAIN_GAUGE_GPIO_PIN to different values.",
+                config.RAIN_GAUGE_GPIO_PIN,
+            )
 
         if config.SENSE_HAT_ENABLED:
             driver = SenseHatDriver()
@@ -71,6 +86,22 @@ class SensorManager:
         modbus = ModbusSensors()
         modbus.initialize()
         self._drivers.append(modbus)
+
+        # BC Robotics 16CH ADC HAT (initialised first so soil moisture can
+        # share the same ADC hardware).
+        if config.BC_ROBOTICS_ADC_ENABLED:
+            adc = BCRobotics16CHADC()
+            adc.initialize()
+            self._drivers.append(adc)
+            self._bc_adc = adc
+
+        # Gravity Capacitive Soil Moisture Sensor (shares ADC with the
+        # BC Robotics HAT when available).
+        if config.SOIL_MOISTURE_ENABLED:
+            soil = SoilMoistureSensor(adc_provider=self._bc_adc)
+            soil.initialize()
+            self._drivers.append(soil)
+            self._soil_moisture = soil
 
         active = [d.name for d in self._drivers if d.available]
         logger.info(

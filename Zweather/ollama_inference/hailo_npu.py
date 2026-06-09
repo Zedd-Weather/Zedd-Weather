@@ -46,9 +46,10 @@ class HailoNPUClient:
                 HailoRTDevice,
             )
 
-            self._device = HailoRTDevice()
+            self._device = HailoRTDevice(config.AI_HAT_DEVICE_ID)
 
             if os.path.isfile(self._model_path):
+                assert self._device is not None
                 self._hef = HEF(self._model_path)
                 params = self._device.create_configure_params(self._hef)
                 self._device.configure(self._hef, params)
@@ -142,7 +143,7 @@ class HailoNPUClient:
                 "source": "hailo_npu",
             }
 
-        except Exception as exc:
+        except (OSError, RuntimeError, ValueError) as exc:
             logger.error("NPU inference failed: %s — falling back to heuristic", exc)
             return self._classify_heuristic(telemetry)
 
@@ -197,7 +198,7 @@ class HailoNPUClient:
             from Zweather.ollama_inference.client import OllamaClient
             client = OllamaClient()
             return client.generate_mitigation(telemetry, forecast)
-        except Exception as exc:
+        except (RuntimeError, ConnectionError) as exc:
             logger.error("Fallback inference also failed: %s", exc)
             return f"Edge inference unavailable: {exc}"
 
@@ -208,5 +209,5 @@ class HailoNPUClient:
         if self._device is not None:
             try:
                 self._device.release()
-            except Exception:
+            except (OSError, RuntimeError):
                 logger.debug("Hailo NPU cleanup failed", exc_info=True)
