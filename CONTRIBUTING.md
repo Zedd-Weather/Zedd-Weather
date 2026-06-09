@@ -10,7 +10,7 @@ By participating in this project you agree to abide by our [Code of Conduct](COD
 
 ### Reporting Bugs
 
-- Search [existing issues](https://github.com/WilliamMajanja/Zedd-Weather/issues) before opening a new one.
+- Search [existing issues](https://github.com/Zedd-Weather/Zedd-Weather/issues) before opening a new one.
 - Use the **Bug Report** issue template.
 - Include steps to reproduce, expected vs actual behaviour, and your environment (OS, Python version, hardware).
 
@@ -73,7 +73,12 @@ docker compose up -d      # Start control plane + storage services
 
 ## Raspberry Pi Hardware Testing
 
-If you have access to a Raspberry Pi 5 with a Sense HAT v2 or AI HAT+, please test hardware-specific changes on real hardware before submitting. Set sensor toggles in `.env` to match your hardware configuration.
+If you have access to real hardware, please test hardware-specific changes before submitting:
+
+- **Raspberry Pi 4/5** with BCRobotics Weather HAT PRO (primary sensor), Hailo AI HAT+, BC Robotics 16CH ADC HAT, or Gravity soil moisture sensor.
+- **Raspberry Pi Zero 2WH** with Weather HAT PRO, Google Coral USB Accelerator, BC Robotics ADC, and Gravity soil moisture sensor.
+
+Set sensor toggles in `.env` to match your hardware configuration. When hardware is absent, drivers report `available=False` and never invent values.
 
 ## Project Policies
 
