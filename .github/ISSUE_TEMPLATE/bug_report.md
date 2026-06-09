@@ -27,7 +27,7 @@ What actually happened. Include any error messages or log output.
 ## Environment
 
 - **OS**: (e.g. Raspberry Pi OS Bookworm, Ubuntu 24.04)
-- **Hardware**: (e.g. Raspberry Pi 5, Sense HAT v2, AI HAT+)
+- **Hardware**: (e.g. Raspberry Pi 5, Weather HAT PRO, Coral USB Accelerator, BC Robotics ADC, soil moisture sensor, AI HAT+)
 - **Python version**: (e.g. 3.12)
 - **Docker version**: (if applicable)
 - **Browser**: (if frontend issue)

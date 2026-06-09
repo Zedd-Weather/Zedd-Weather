@@ -15,13 +15,13 @@ If you need help with Zedd Weather, here are the best ways to get support:
 
 ### Issues
 
-- **Bug reports**: Open a [Bug Report](https://github.com/WilliamMajanja/Zedd-Weather/issues/new?template=bug_report.md) issue.
-- **Feature requests**: Open a [Feature Request](https://github.com/WilliamMajanja/Zedd-Weather/issues/new?template=feature_request.md) issue.
-- **Questions**: Open a [Discussion](https://github.com/WilliamMajanja/Zedd-Weather/discussions) or a general issue.
+- **Bug reports**: Open a [Bug Report](https://github.com/Zedd-Weather/Zedd-Weather/issues/new?template=bug_report.md) issue.
+- **Feature requests**: Open a [Feature Request](https://github.com/Zedd-Weather/Zedd-Weather/issues/new?template=feature_request.md) issue.
+- **Questions**: Open a [Discussion](https://github.com/Zedd-Weather/Zedd-Weather/discussions) or a general issue.
 
 ### Before Opening an Issue
 
-1. Search existing [issues](https://github.com/WilliamMajanja/Zedd-Weather/issues) and [discussions](https://github.com/WilliamMajanja/Zedd-Weather/discussions) to see if your question has already been answered.
+1. Search existing [issues](https://github.com/Zedd-Weather/Zedd-Weather/issues) and [discussions](https://github.com/Zedd-Weather/Zedd-Weather/discussions) to see if your question has already been answered.
 2. Include your environment details: OS, Python version, Docker version, and hardware (e.g. Raspberry Pi model, attached HATs).
 3. For bugs, include steps to reproduce and relevant log output.
 
