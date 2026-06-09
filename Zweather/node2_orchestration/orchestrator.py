@@ -8,11 +8,10 @@ import logging
 import hashlib
 import hmac
 import os
+import threading
 from datetime import datetime, timezone
 import paho.mqtt.client as mqtt
 import aiohttp
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 MQTT_BROKER = os.environ.get("MQTT_BROKER_HOST", "127.0.0.1")
 MQTT_PORT = int(os.environ.get("MQTT_BROKER_PORT", "1883"))
@@ -42,7 +41,8 @@ except ValueError as exc:
 
 class ZeddOrchestrator:
     def __init__(self):
-        self.latest_telemetry = None
+        self._lock = threading.Lock()
+        self._latest_telemetry = None
         self.mqtt_client = mqtt.Client(client_id="node2_orchestrator")
         self.mqtt_client.username_pw_set(
             os.environ.get("MQTT_USERNAME", ""),
@@ -52,14 +52,24 @@ class ZeddOrchestrator:
         self.mqtt_client.on_message = self.on_message
         self.session = None
 
+    @property
+    def latest_telemetry(self):
+        with self._lock:
+            return self._latest_telemetry
+
+    @latest_telemetry.setter
+    def latest_telemetry(self, value):
+        with self._lock:
+            self._latest_telemetry = value
+
     def on_connect(self, client, userdata, flags, rc):
         logging.info("Connected to MQTT Broker. Subscribing to telemetry...")
         client.subscribe(MQTT_TOPIC, qos=1)
 
     def on_message(self, client, userdata, msg):
         try:
-            self.latest_telemetry = json.loads(msg.payload.decode("utf-8", errors="replace"))
-            logging.debug(f"Received telemetry: {self.latest_telemetry}")
+            self._latest_telemetry = json.loads(msg.payload.decode("utf-8", errors="replace"))
+            logging.debug("Received telemetry: %s", self._latest_telemetry)
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             logging.error("Invalid payload received: %s", exc)
 
@@ -77,7 +87,7 @@ class ZeddOrchestrator:
                 body = await resp.text()
                 logging.warning("AccuWeather location lookup returned %s: %s", resp.status, body[:200])
                 return None
-        except Exception as exc:
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             logging.error("AccuWeather location lookup failed: %s", exc)
             return None
 
@@ -113,7 +123,7 @@ class ZeddOrchestrator:
                     body = await resp.text()
                     logging.warning("AccuWeather API returned status %s: %s", resp.status, body[:200])
                     return None
-        except Exception as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logging.error("Failed to fetch macro forecast: %s", e)
             return None
 
@@ -158,7 +168,7 @@ class ZeddOrchestrator:
                 "analysis": result,
                 "directive": result.get("risk_level", "unknown"),
             }
-        except Exception as e:
+        except (ValueError, KeyError, TypeError) as e:
             logging.error("Sector engine analysis failed: %s", e)
             return {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -188,7 +198,7 @@ class ZeddOrchestrator:
             "protocol": "Minima-Zedd-v1"
         }
         if signature:
-            logging.info(f"Attestation generated: {signature}")
+            logging.info("Attestation generated: %s", signature)
         # In production, submit attestation to Minima RPC here
         return attestation_record
 
@@ -202,22 +212,24 @@ class ZeddOrchestrator:
         
         try:
             while True:
-                if self.latest_telemetry:
+                telemetry = self._latest_telemetry
+                if telemetry:
                     macro_data = await self.fetch_macro_forecast()
-                    directive = self.run_inference(self.latest_telemetry, macro_data)
-                    
+                    directive = self.run_inference(telemetry, macro_data)
+
                     if directive:
                         self.attest_directive(directive)
-                        # Store or broadcast attestation
-                        
-                await asyncio.sleep(60) # Run orchestration cycle every 60s
+
+                await asyncio.sleep(60)
         except asyncio.CancelledError:
             logging.info("Orchestration loop cancelled.")
         finally:
-            await self.session.close()
+            if self.session:
+                await self.session.close()
             self.mqtt_client.loop_stop()
             self.mqtt_client.disconnect()
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
     orchestrator = ZeddOrchestrator()
     asyncio.run(orchestrator.orchestration_loop())

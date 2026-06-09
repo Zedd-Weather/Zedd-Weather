@@ -102,7 +102,7 @@ class WebhookChannel(NotificationChannel):
         except ImportError:
             logger.error("requests library not available for WebhookChannel.")
             return False
-        except Exception as exc:  # noqa: BLE001
+        except requests.RequestException as exc:
             logger.error("Webhook delivery failed for alert %s: %s", alert.id, exc)
             return False
 
@@ -143,7 +143,7 @@ class MqttChannel(NotificationChannel):
         except ImportError:
             logger.error("paho-mqtt not available for MqttChannel.")
             return False
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError) as exc:
             logger.error("MQTT delivery failed for alert %s: %s", alert.id, exc)
             return False
 
@@ -178,7 +178,7 @@ class AlertDispatcher:
             name = type(channel).__name__
             try:
                 results[name] = channel.send(alert)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error("Channel %s raised an exception: %s", name, exc)
                 results[name] = False
         return results

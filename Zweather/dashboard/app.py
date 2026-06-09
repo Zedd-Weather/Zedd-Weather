@@ -39,7 +39,7 @@ import json
 import logging
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import dash_bootstrap_components as dbc
@@ -50,8 +50,27 @@ from dash import Dash, Input, Output, State, callback, ctx, dcc, html, no_update
 logger = logging.getLogger(__name__)
 
 API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
-DEFAULT_LAT = 37.7749
-DEFAULT_LNG = -122.4194
+
+def _default_lat() -> float:
+    raw = os.getenv("DEFAULT_LAT")
+    if raw is not None:
+        try:
+            return float(raw)
+        except ValueError:
+            logger.warning("Invalid DEFAULT_LAT '%s', using default", raw)
+    return 37.7749
+
+def _default_lng() -> float:
+    raw = os.getenv("DEFAULT_LNG")
+    if raw is not None:
+        try:
+            return float(raw)
+        except ValueError:
+            logger.warning("Invalid DEFAULT_LNG '%s', using default", raw)
+    return -122.4194
+
+DEFAULT_LAT = _default_lat()
+DEFAULT_LNG = _default_lng()
 
 # ---------------------------------------------------------------------------
 # Colour palette
@@ -87,6 +106,11 @@ SECTOR_OPTIONS = [
     {"label": "🏗️  Construction", "value": "construction"},
     {"label": "🌾  Agricultural", "value": "agricultural"},
     {"label": "🏭  Industrial", "value": "industrial"},
+    {"label": "🏠  Residential", "value": "residential"},
+    {"label": "🚢  Marine", "value": "marine"},
+    {"label": "✈️  Aviation", "value": "aviation"},
+    {"label": "⚡  Energy", "value": "energy"},
+    {"label": "🚛  Transportation", "value": "transportation"},
 ]
 
 
@@ -99,7 +123,7 @@ def _api_get(path: str, params: dict[str, Any] | None = None) -> Any:
         r = requests.get(f"{API_BASE}{path}", params=params, timeout=15)
         r.raise_for_status()
         return r.json()
-    except Exception as exc:
+    except requests.RequestException as exc:
         logger.warning("API GET %s failed: %s", path, exc)
         return None
 
@@ -109,7 +133,7 @@ def _api_post(path: str, data: dict[str, Any]) -> Any:
         r = requests.post(f"{API_BASE}{path}", json=data, timeout=30)
         r.raise_for_status()
         return r.json()
-    except Exception as exc:
+    except requests.RequestException as exc:
         logger.warning("API POST %s failed: %s", path, exc)
         return None
 
@@ -259,27 +283,73 @@ def _safety_layout() -> html.Div:
             html.Div(
                 id="risk-panel",
                 children=[
-                    # Sector selector
+                    # Sector + Region + Season selectors
                     html.Div(
                         [
-                            html.Label("Sector", style={"fontSize": "11px", "color": C["slate400"], "textTransform": "uppercase", "letterSpacing": "0.06em", "marginBottom": "4px", "display": "block"}),
-                            dcc.Dropdown(
-                                id="risk-sector",
-                                options=SECTOR_OPTIONS,
-                                value="construction",
-                                clearable=False,
-                                className="zedd-dropdown",
-                                style={"width": "230px"},
+                            html.Div(
+                                [
+                                    html.Label("Sector", style={"fontSize": "11px", "color": C["slate400"], "textTransform": "uppercase", "letterSpacing": "0.06em", "marginBottom": "4px", "display": "block"}),
+                                    dcc.Dropdown(
+                                        id="risk-sector",
+                                        options=SECTOR_OPTIONS,
+                                        value="construction",
+                                        clearable=False,
+                                        className="zedd-dropdown",
+                                        style={"width": "200px"},
+                                    ),
+                                ],
+                            ),
+                            html.Div(
+                                [
+                                    html.Label("Region", style={"fontSize": "11px", "color": C["slate400"], "textTransform": "uppercase", "letterSpacing": "0.06em", "marginBottom": "4px", "display": "block"}),
+                                    dcc.Dropdown(
+                                        id="risk-region",
+                                        options=[
+                                            {"label": "Midlands", "value": "midlands"},
+                                            {"label": "London & SE", "value": "london"},
+                                            {"label": "Manchester / North", "value": "manchester"},
+                                            {"label": "Glasgow / West Scotland", "value": "glasgow"},
+                                            {"label": "Edinburgh / East Scotland", "value": "edinburgh"},
+                                            {"label": "Cardiff / Wales", "value": "cardiff"},
+                                            {"label": "Belfast / NI", "value": "belfast"},
+                                        ],
+                                        value=None,
+                                        clearable=True,
+                                        placeholder="Default (Midlands)",
+                                        className="zedd-dropdown",
+                                        style={"width": "200px"},
+                                    ),
+                                ],
+                            ),
+                            html.Div(
+                                [
+                                    html.Label("Season", style={"fontSize": "11px", "color": C["slate400"], "textTransform": "uppercase", "letterSpacing": "0.06em", "marginBottom": "4px", "display": "block"}),
+                                    dcc.Dropdown(
+                                        id="risk-season",
+                                        options=[
+                                            {"label": "Spring", "value": "spring"},
+                                            {"label": "Summer", "value": "summer"},
+                                            {"label": "Autumn", "value": "autumn"},
+                                            {"label": "Winter", "value": "winter"},
+                                        ],
+                                        value=None,
+                                        clearable=True,
+                                        placeholder="Auto (current month)",
+                                        className="zedd-dropdown",
+                                        style={"width": "200px"},
+                                    ),
+                                ],
                             ),
                         ],
-                        style={"marginBottom": "14px"},
+                        style={"display": "flex", "gap": "12px", "marginBottom": "14px", "flexWrap": "wrap"},
                     ),
                     # Current telemetry summary
                     html.Div(id="risk-telemetry-summary", style={"marginBottom": "14px"}),
                     # Action buttons
                     html.Div(
                         [
-                            _btn("⚡  Auto-Analyze Risk", "auto-analyze-btn"),
+                            _btn("🧠  AI Analyze", "auto-analyze-btn"),
+                            _btn("📊  Heuristic Analyze", "heuristic-analyze-btn", C["indigo"]),
                             dcc.Upload(
                                 id="media-upload",
                                 children=_btn("📷  Upload Media & Analyze", "media-btn", C["slate800"]),
@@ -785,6 +855,77 @@ def _auto_analyze(n: int, store: dict[str, Any] | None, sector: str | None) -> t
     return ui, {"riskLevel": level, "report": report}
 
 
+# ── Safety tab: heuristic analyze ────────────────────────────────────────────
+
+@callback(
+    Output("risk-results", "children", allow_duplicate=True),
+    Output("risk-store", "data", allow_duplicate=True),
+    Input("heuristic-analyze-btn", "n_clicks"),
+    State("telemetry-store", "data"),
+    State("risk-sector", "value"),
+    State("risk-region", "value"),
+    State("risk-season", "value"),
+    prevent_initial_call=True,
+)
+def _heuristic_analyze(
+    n: int, store: dict[str, Any] | None, sector: str | None,
+    region: str | None, season: str | None,
+) -> tuple:
+    if not n:
+        return no_update, no_update
+    t = (store or {}).get("telemetry") or {}
+    payload = {
+        "telemetry": {
+            "temperature": t.get("temp", 22.0),
+            "humidity": t.get("humidity", 50.0),
+            "pressure": t.get("pressure", 1013.0),
+            "wind_speed": t.get("wind_speed"),
+            "uv_index": t.get("uvIndex"),
+            "rainfall_mm": t.get("precipitation"),
+            "aqi": t.get("aqi"),
+        },
+        "sector": sector or "construction",
+    }
+    if region:
+        payload["region"] = region
+    if season:
+        payload["season"] = season
+
+    result = _api_post("/api/analyze", payload)
+    if not result:
+        result = {"analysis": {"risk_level": "medium", "recommendations": ["API unavailable."]}}
+
+    analysis = result.get("analysis", {})
+    level = analysis.get("risk_level", "medium")
+    recs = analysis.get("recommendations", [])
+    col = RISK_COLORS.get(level.title(), RISK_COLORS["Amber"])
+
+    rec_items = [html.Li(r, style={"fontSize": "12px", "color": C["slate300"], "marginBottom": "4px"}) for r in recs[:5]]
+
+    details = []
+    for k, v in analysis.items():
+        if k in ("risk_level", "recommendations", "region", "season"):
+            continue
+        if isinstance(v, dict):
+            for sk, sv in v.items():
+                details.append(html.Div([
+                    html.Span(f"{sk}: ", style={"color": C["slate400"], "fontSize": "11px"}),
+                    html.Span(str(sv)[:80], style={"color": C["slate200"], "fontSize": "11px", "fontWeight": "600"}),
+                ], style={"marginBottom": "2px"}))
+
+    ui = html.Div(
+        [
+            html.Div(
+                [html.Span("Heuristic Risk Level: ", style={"color": C["slate400"]}), _risk_badge(level.title())],
+                style={"display": "flex", "alignItems": "center", "gap": "8px", "marginBottom": "10px"},
+            ),
+            html.Div(details, style={**_card_style(padding="10px"), "marginBottom": "10px"}),
+            html.Ul(rec_items, style={"paddingLeft": "20px", "margin": "0"}) if rec_items else "",
+        ]
+    )
+    return ui, {"riskLevel": level, "report": "\n".join(recs)}
+
+
 # ── Safety tab: media upload + analyze ──────────────────────────────────────
 
 @callback(
@@ -836,7 +977,7 @@ def _shard_directives(
     chunks = [c.strip() for c in report.split("\n\n") if c.strip()]
     shards: list[dict[str, str]] = []
     for i, chunk in enumerate(chunks):
-        digest = hashlib.sha256(f"{chunk}{datetime.utcnow().isoformat()}{i}".encode()).hexdigest()
+        digest = hashlib.sha256(f"{chunk}{datetime.now(timezone.utc).isoformat()}{i}".encode()).hexdigest()
         shards.append({"id": f"Shard-{i + 1}", "hash": f"0x{digest}", "content": chunk})
 
     locker_list: list[dict[str, Any]] = list(locker or [])
@@ -844,7 +985,7 @@ def _shard_directives(
         0,
         {
             "id": str(uuid.uuid4()),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "shards": shards,
             "report": report,
             "riskLevel": level,
@@ -1025,7 +1166,7 @@ def _export_shards(n: int, locker: list | None) -> dict[str, Any] | None:
     if not n or not locker:
         return None
     content = json.dumps(locker, indent=2)
-    return {"content": content, "filename": f"zedd_shards_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json", "type": "application/json"}
+    return {"content": content, "filename": f"zedd_shards_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json", "type": "application/json"}
 
 
 # ── More tab: site map ────────────────────────────────────────────────────────

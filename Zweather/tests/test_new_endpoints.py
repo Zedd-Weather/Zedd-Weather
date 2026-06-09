@@ -14,6 +14,10 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 import Zweather.api as api_module
 
+# Ensure submodules are importable for mock patching.
+import Zweather.weather_client  # noqa: F401
+import Zweather.ai_client  # noqa: F401
+
 client = TestClient(api_module.app)
 
 

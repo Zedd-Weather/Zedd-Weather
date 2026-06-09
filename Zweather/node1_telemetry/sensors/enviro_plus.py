@@ -26,6 +26,7 @@ class EnviroPlusSensor(BaseSensor):
     def __init__(self):
         super().__init__("enviro_plus")
         self._bme280 = None
+        self._bme280_bus = None
         self._ltr559 = None
         self._gas = None
         self._pms5003 = None
@@ -45,6 +46,7 @@ class EnviroPlusSensor(BaseSensor):
             from bme280 import BME280
             from smbus2 import SMBus
             bus = SMBus(1)
+            self._bme280_bus = bus
             self._bme280 = BME280(i2c_dev=bus)
             # Discard first reading (sensor warm-up)
             self._bme280.get_temperature()
@@ -128,7 +130,7 @@ class EnviroPlusSensor(BaseSensor):
                 data["pm1_0_ug_m3"] = pm.pm_ug_per_m3(1.0)
                 data["pm2_5_ug_m3"] = pm.pm_ug_per_m3(2.5)
                 data["pm10_ug_m3"] = pm.pm_ug_per_m3(10)
-            except Exception as exc:
+            except (OSError, AttributeError) as exc:
                 logger.error("PMS5003 read error: %s", exc)
 
         return data
@@ -137,8 +139,20 @@ class EnviroPlusSensor(BaseSensor):
     # Cleanup
     # ------------------------------------------------------------------
     def cleanup(self) -> None:
+        if self._bme280_bus is not None:
+            try:
+                self._bme280_bus.close()
+            except OSError:
+                logger.debug("Enviro+ BME280 bus close failed", exc_info=True)
+
+        if self._ltr559 is not None:
+            try:
+                self._ltr559._light_sensor = None  # no public close method
+            except AttributeError:
+                pass
+
         if self._pms5003 is not None:
             try:
                 self._pms5003.reset()
-            except Exception:
+            except (OSError, RuntimeError):
                 logger.debug("Enviro+ PMS5003 cleanup failed", exc_info=True)

@@ -1,7 +1,17 @@
 """
 Agricultural intelligence engine for Zedd Weather.
 Heuristic-based analysis of telemetry data to produce crop recommendations.
+Supports UK regional climate profiles with seasonally-adjusted thresholds.
 """
+from Zweather.global_regions.regions import (
+    get_region,
+    resolve_season,
+    region_adjusted_heat_threshold,
+    region_adjusted_cold_threshold,
+    region_adjusted_rain_threshold,
+)
+from Zweather.global_regions.models import UKRegion, Season
+
 from .models import (
     CropProfile,
     CROP_PROFILES,
@@ -13,6 +23,9 @@ from .models import (
 class AgriculturalEngine:
     """
     Analyses weather telemetry and produces actionable agricultural recommendations.
+
+    Accepts an optional ``region`` parameter (UK region or city name) and
+    optional ``season`` to adjust thresholds for local climate norms.
 
     All algorithms are heuristic — no external ML libraries required.
     """
@@ -35,7 +48,13 @@ class AgriculturalEngine:
     # Public API
     # ---------------------------------------------------------------------------
 
-    def analyze(self, telemetry: dict, crop: str = "maize") -> dict:
+    def analyze(
+        self,
+        telemetry: dict,
+        crop: str = "maize",
+        region: str | UKRegion | None = None,
+        season: str | Season | None = None,
+    ) -> dict:
         """
         Run a full agricultural analysis for the given telemetry snapshot.
 
@@ -54,12 +73,15 @@ class AgriculturalEngine:
             disease_risks, weather_stress, recommendations
         """
         profile = self._get_profile(crop)
+        rp = get_region(region)
+        sn = resolve_season(season)
+
         soil = self.predict_soil_moisture(telemetry)
         irrigation = self.irrigation_schedule(telemetry, crop)
-        pest_risks = self.detect_pest_risk(telemetry, crop)
-        disease_risks = self.detect_disease_risk(telemetry, crop)
-        stress = self.weather_stress_analysis(telemetry, crop)
-        risk_level = self.compute_risk_level(telemetry, crop)
+        pest_risks = self.detect_pest_risk(telemetry, crop, region, season)
+        disease_risks = self.detect_disease_risk(telemetry, crop, region, season)
+        stress = self.weather_stress_analysis(telemetry, crop, region, season)
+        risk_level = self.compute_risk_level(telemetry, crop, region, season)
 
         recommendations = self._build_recommendations(
             telemetry, profile, soil, irrigation, pest_risks, disease_risks, stress
@@ -69,6 +91,8 @@ class AgriculturalEngine:
             "crop": crop,
             "crop_name": profile.name,
             "risk_level": risk_level,
+            "region": rp.name,
+            "season": sn.value,
             "soil_moisture": {
                 "estimated_vwc_pct": soil.estimated_vwc_pct,
                 "confidence": soil.confidence,
@@ -205,25 +229,25 @@ class AgriculturalEngine:
             next_check_hours=next_check,
         )
 
-    def detect_pest_risk(self, telemetry: dict, crop: str) -> list[dict]:
-        """
-        Identify pest risk conditions from telemetry.
+    def detect_pest_risk(
+        self,
+        telemetry: dict,
+        crop: str,
+        region: str | UKRegion | None = None,
+        season: str | Season | None = None,
+    ) -> list[dict]:
+        rp = get_region(region)
+        sn = resolve_season(season)
 
-        Rules:
-        - High temp + high humidity → aphid / fungal-feeding insect risk
-        - Low humidity + high temp → spider mite risk
-        - Warm night temperatures (proxy: high temp persisting) → moth/larva risk
-
-        Returns
-        -------
-        list of dicts, each with keys: pest, risk_level, condition, recommendation
-        """
         temp = float(telemetry.get("temperature", 20.0))
         humidity = float(telemetry.get("humidity", 60.0))
+        heat_adjusted = region_adjusted_heat_threshold(temp, rp, sn)
+        high_humidity = self._HIGH_HUMIDITY_THRESHOLD - rp.temp_threshold_adjustment
+        low_humidity = self._LOW_HUMIDITY_THRESHOLD + rp.temp_threshold_adjustment
+
         risks: list[dict] = []
 
-        # Spider mites: hot and dry
-        if temp > self._HIGH_TEMP_THRESHOLD and humidity < self._LOW_HUMIDITY_THRESHOLD:
+        if heat_adjusted > self._HIGH_TEMP_THRESHOLD and humidity < low_humidity:
             risks.append({
                 "pest": "Spider Mites",
                 "risk_level": "high",
@@ -231,8 +255,7 @@ class AgriculturalEngine:
                 "recommendation": "Increase irrigation frequency; consider miticide application.",
             })
 
-        # Aphids / soft-bodied insects: warm and humid
-        if temp > 20.0 and humidity > self._HIGH_HUMIDITY_THRESHOLD:
+        if heat_adjusted > 20.0 and humidity > high_humidity:
             risks.append({
                 "pest": "Aphids / Whiteflies",
                 "risk_level": "medium" if humidity < 90.0 else "high",
@@ -240,8 +263,7 @@ class AgriculturalEngine:
                 "recommendation": "Scout crops for aphid colonies; apply neem oil or insecticidal soap.",
             })
 
-        # Locust / grasshopper: very hot and dry
-        if temp > 38.0 and humidity < 30.0:
+        if heat_adjusted > 38.0 and humidity < 30.0:
             risks.append({
                 "pest": "Locusts / Grasshoppers",
                 "risk_level": "high",
@@ -249,8 +271,7 @@ class AgriculturalEngine:
                 "recommendation": "Monitor surrounding vegetation; coordinate with regional pest control.",
             })
 
-        # Moth larvae: sustained high temperatures
-        if temp > 28.0 and humidity > 50.0:
+        if heat_adjusted > 28.0 and humidity > 50.0:
             risks.append({
                 "pest": "Moth Larvae / Stem Borers",
                 "risk_level": "low" if temp < 32.0 else "medium",
@@ -268,25 +289,23 @@ class AgriculturalEngine:
 
         return risks
 
-    def detect_disease_risk(self, telemetry: dict, crop: str) -> list[dict]:
-        """
-        Identify crop disease risk conditions from telemetry.
+    def detect_disease_risk(
+        self,
+        telemetry: dict,
+        crop: str,
+        region: str | UKRegion | None = None,
+        season: str | Season | None = None,
+    ) -> list[dict]:
+        rp = get_region(region)
+        sn = resolve_season(season)
 
-        Rules:
-        - Prolonged high humidity → mold, blight, powdery mildew
-        - High humidity + moderate temp → downy mildew
-        - Low humidity + heat → leaf scorch
-
-        Returns
-        -------
-        list of dicts with keys: disease, risk_level, condition, recommendation
-        """
         temp = float(telemetry.get("temperature", 20.0))
         humidity = float(telemetry.get("humidity", 60.0))
+        heat_adjusted = region_adjusted_heat_threshold(temp, rp, sn)
+        high_humidity = self._HIGH_HUMIDITY_THRESHOLD - rp.temp_threshold_adjustment
         risks: list[dict] = []
 
-        # Late blight (e.g., Phytophthora): cool-to-moderate + very humid
-        if 10.0 <= temp <= 25.0 and humidity > 85.0:
+        if 10.0 <= temp <= 25.0 and humidity > high_humidity + 5:
             risks.append({
                 "disease": "Late Blight (Phytophthora)",
                 "risk_level": "high",
@@ -294,8 +313,7 @@ class AgriculturalEngine:
                 "recommendation": "Apply preventative fungicide; improve canopy air circulation.",
             })
 
-        # Powdery mildew: warm and moderately humid
-        if 20.0 <= temp <= 30.0 and 60.0 <= humidity <= 80.0:
+        if 20.0 <= heat_adjusted <= 30.0 and 60.0 <= humidity <= 80.0:
             risks.append({
                 "disease": "Powdery Mildew",
                 "risk_level": "medium",
@@ -303,8 +321,7 @@ class AgriculturalEngine:
                 "recommendation": "Monitor leaf surfaces; apply sulphur-based fungicide if detected.",
             })
 
-        # Gray mold (Botrytis): cool and very humid
-        if temp < 20.0 and humidity > 90.0:
+        if heat_adjusted < 20.0 and humidity > 90.0:
             risks.append({
                 "disease": "Gray Mold (Botrytis)",
                 "risk_level": "high",
@@ -312,8 +329,7 @@ class AgriculturalEngine:
                 "recommendation": "Remove infected plant material; improve drainage and ventilation.",
             })
 
-        # Leaf scorch: very hot and dry
-        if temp > 35.0 and humidity < 30.0:
+        if heat_adjusted > 35.0 and humidity < 30.0:
             risks.append({
                 "disease": "Leaf Scorch / Heat Stress Necrosis",
                 "risk_level": "medium",
@@ -331,29 +347,32 @@ class AgriculturalEngine:
 
         return risks
 
-    def weather_stress_analysis(self, telemetry: dict, crop: str) -> dict:
-        """
-        Analyse atmospheric conditions for crop stress indicators.
-
-        Returns
-        -------
-        dict with keys: heat_stress, cold_stress, frost_risk, humidity_stress,
-                        pressure_alert, overall_stress
-        """
+    def weather_stress_analysis(
+        self,
+        telemetry: dict,
+        crop: str,
+        region: str | UKRegion | None = None,
+        season: str | Season | None = None,
+    ) -> dict:
         profile = self._get_profile(crop)
+        rp = get_region(region)
+        sn = resolve_season(season)
+
         temp = float(telemetry.get("temperature", 20.0))
         humidity = float(telemetry.get("humidity", 60.0))
         pressure = float(telemetry.get("pressure", 1013.0))
 
-        heat_stress = temp > profile.temp_stress_max
-        cold_stress = temp < profile.temp_stress_min
-        frost_risk = temp <= profile.temp_frost_kill
+        heat_adjusted = region_adjusted_heat_threshold(temp, rp, sn)
+        cold_adjusted = region_adjusted_cold_threshold(temp, rp, sn)
+
+        heat_stress = heat_adjusted > profile.temp_stress_max
+        cold_stress = cold_adjusted < profile.temp_stress_min
+        frost_risk = cold_adjusted <= profile.temp_frost_kill
         humidity_stress = (
             humidity < profile.humidity_optimal_min or humidity > profile.humidity_optimal_max
         )
         pressure_alert = pressure < profile.pressure_storm_threshold
 
-        # Overall stress: any critical flag raises the level
         stress_count = sum([heat_stress, cold_stress, frost_risk, humidity_stress, pressure_alert])
         if frost_risk or (heat_stress and humidity_stress):
             overall = "critical"
@@ -380,15 +399,14 @@ class AgriculturalEngine:
             },
         }
 
-    def compute_risk_level(self, telemetry: dict, crop: str) -> str:
-        """
-        Compute overall agricultural risk level from telemetry.
-
-        Returns
-        -------
-        "low", "medium", "high", or "critical"
-        """
-        stress = self.weather_stress_analysis(telemetry, crop)
+    def compute_risk_level(
+        self,
+        telemetry: dict,
+        crop: str,
+        region: str | UKRegion | None = None,
+        season: str | Season | None = None,
+    ) -> str:
+        stress = self.weather_stress_analysis(telemetry, crop, region, season)
         pest_risks = self.detect_pest_risk(telemetry, crop)
         disease_risks = self.detect_disease_risk(telemetry, crop)
         soil = self.predict_soil_moisture(telemetry)

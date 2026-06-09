@@ -1,0 +1,62 @@
+# =============================================================================
+# Zedd-Weather Edge Collector – Pi Zero 2WH Dockerfile
+# Target architecture: linux/arm64 (Raspberry Pi Zero 2WH with 64-bit OS)
+# =============================================================================
+#
+# Build:
+#   docker buildx build --platform linux/arm64 \
+#     -t zedd-weather-pizero:latest \
+#     -f Dockerfile.pizero .
+#
+# Run (privileged for GPIO + I2C + Coral USB):
+#   docker run --privileged \
+#     --device /dev/gpiomem \
+#     --device /dev/i2c-1 \
+#     --device /dev/apex_0:/dev/apex_0 \
+#     -v /sys:/sys \
+#     -e MQTT_BROKER_HOST=10.0.0.50 \
+#     -e CORAL_ENABLED=true \
+#     zedd-weather-pizero:latest
+
+# ---------------------------------------------------------------------------
+# Single stage — build and run on-device for arm64 native performance
+# ---------------------------------------------------------------------------
+FROM python:3.12-slim-trixie
+
+LABEL org.opencontainers.image.title="zedd-weather-pizero"
+LABEL org.opencontainers.image.description="Zedd-Weather Pi Zero 2WH edge collector (Coral TPU)"
+LABEL org.opencontainers.image.source="https://github.com/WilliamMajanja/Zedd-Weather"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# System dependencies: I2C, GPIO, Coral USB (libusb)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libi2c-dev \
+        libusb-1.0-0-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy dependency list first for Docker layer caching
+COPY Zweather/requirements.pizero.txt requirements.txt
+
+# Install Python deps — skip hardware-only RPi packages in non-RPi builds
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir \
+        $(grep -v -E \
+            '^\s*(RPi\.GPIO|gpiozero)' \
+            requirements.txt \
+          | grep -v '^\s*#' \
+          | grep -v '^\s*$')
+
+# Copy application source
+COPY Zweather/ ./Zweather/
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    SQLITE_DB_PATH=/tmp/zedd_buffer.db \
+    WEATHER_HAT_PRO_ENABLED=true
+
+# Everything writable lives on tmpfs
+VOLUME ["/tmp"]
+
+ENTRYPOINT ["python", "-m", "Zweather.app_pizero"]

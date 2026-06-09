@@ -20,10 +20,6 @@ from Zweather.node1_telemetry.sensors.sensor_manager import SensorManager
 from Zweather.node1_telemetry.hat_control.led_display import LEDDisplay
 from Zweather.node1_telemetry.hat_control.alarm import AlarmController
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
@@ -77,7 +73,11 @@ def main():
     led.show_risk_level("green")
 
     # 3. Connect to MQTT broker
-    client = mqtt.Client(client_id=config.MQTT_CLIENT_ID, clean_session=False)
+    # paho-mqtt <2.0 uses clean_session; >=2.0 uses clean_start.
+    try:
+        client = mqtt.Client(client_id=config.MQTT_CLIENT_ID, clean_session=False)
+    except TypeError:
+        client = mqtt.Client(client_id=config.MQTT_CLIENT_ID, clean_start=False)
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
 
@@ -103,23 +103,34 @@ def main():
     # 4. Publish loop
     try:
         while True:
-            payload = sensor_mgr.read_all()
+            try:
+                payload = sensor_mgr.read_all()
+            except Exception as exc:
+                logger.error("Sensor read failed: %s", exc)
+                time.sleep(config.PUBLISH_INTERVAL)
+                continue
 
-            # Evaluate alarms
-            alarm.evaluate(payload)
+            try:
+                alarm.evaluate(payload)
+            except Exception as exc:
+                logger.error("Alarm evaluation failed: %s", exc)
 
-            # Update LED risk display
-            risk = _compute_risk_level(payload)
-            led.show_risk_level(risk)
+            try:
+                risk = _compute_risk_level(payload)
+                led.show_risk_level(risk)
+            except Exception as exc:
+                logger.error("LED display update failed: %s", exc)
 
-            # Publish
-            result = client.publish(
-                config.MQTT_TOPIC, json.dumps(payload), qos=1
-            )
-            if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                logger.debug("Published: %s", payload)
-            else:
-                logger.error("Failed to publish telemetry.")
+            try:
+                result = client.publish(
+                    config.MQTT_TOPIC, json.dumps(payload), qos=1
+                )
+                if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                    logger.debug("Published: %s", payload)
+                else:
+                    logger.error("Failed to publish telemetry (rc=%s).", mqtt.connack_string(result.rc) if hasattr(mqtt, 'connack_string') else result.rc)
+            except Exception as exc:
+                logger.error("MQTT publish failed: %s", exc)
 
             time.sleep(config.PUBLISH_INTERVAL)
     except KeyboardInterrupt:
@@ -133,4 +144,8 @@ def main():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
     main()

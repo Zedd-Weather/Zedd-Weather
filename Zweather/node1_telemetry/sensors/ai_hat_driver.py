@@ -46,7 +46,7 @@ class AIHatDriver(BaseSensor):
             from hailo_platform import (  # type: ignore[import-untyped]
                 HailoRTDevice,
             )
-            self._device = HailoRTDevice()
+            self._device = HailoRTDevice(config.AI_HAT_DEVICE_ID)
             self._available = True
             logger.info(
                 "AI HAT+ (Hailo-8L NPU) initialised — device %s.",
@@ -72,17 +72,18 @@ class AIHatDriver(BaseSensor):
 
     def _read_hardware(self) -> dict:
         """Query live diagnostics from the Hailo runtime."""
-        assert self._device is not None
+        if self._device is None:
+            return self._read_unavailable_status()
         try:
             info = self._device.control.get_chip_temperature()
             npu_temp = round(float(info.ts0_temperature), 1)
-        except Exception:
+        except (OSError, RuntimeError, ValueError):
             npu_temp = 0.0
 
         try:
             power = self._device.control.get_power_measurement()
             npu_power = round(float(power), 2)
-        except Exception:
+        except (OSError, RuntimeError, ValueError):
             npu_power = 0.0
 
         return {
@@ -123,5 +124,5 @@ class AIHatDriver(BaseSensor):
         if self._device is not None:
             try:
                 self._device.release()
-            except Exception:
+            except (OSError, RuntimeError):
                 logger.debug("AI HAT cleanup failed", exc_info=True)

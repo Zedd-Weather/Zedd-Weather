@@ -21,6 +21,7 @@ class AlarmController:
         self._gpio = None
         self._available = False
         self._active = False
+        self._lock = threading.Lock()
         self._pulse_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
 
@@ -31,7 +32,8 @@ class AlarmController:
         try:
             import RPi.GPIO as GPIO
             self._gpio = GPIO
-            GPIO.setmode(GPIO.BCM)
+            if GPIO.getmode() is None:
+                GPIO.setmode(GPIO.BCM)
             GPIO.setup(config.ALARM_BUZZER_GPIO_PIN, GPIO.OUT, initial=GPIO.LOW)
             GPIO.setup(config.ALARM_LED_GPIO_PIN, GPIO.OUT, initial=GPIO.LOW)
             self._available = True
@@ -48,29 +50,31 @@ class AlarmController:
     # ------------------------------------------------------------------
     def trigger(self) -> None:
         """Activate the alarm (buzzer + LED pulsing)."""
-        if self._active:
-            return
-        self._active = True
-        logger.warning("ALARM TRIGGERED — activating buzzer and LED.")
+        with self._lock:
+            if self._active:
+                return
+            self._active = True
+            logger.warning("ALARM TRIGGERED — activating buzzer and LED.")
 
-        if self._available:
-            self._stop_event.clear()
-            self._pulse_thread = threading.Thread(
-                target=self._pulse_loop, daemon=True
-            )
-            self._pulse_thread.start()
+            if self._available:
+                self._stop_event.clear()
+                self._pulse_thread = threading.Thread(
+                    target=self._pulse_loop, daemon=True
+                )
+                self._pulse_thread.start()
 
     def silence(self) -> None:
         """Deactivate the alarm."""
-        if not self._active:
-            return
-        self._active = False
-        self._stop_event.set()
-        logger.info("Alarm silenced.")
+        with self._lock:
+            if not self._active:
+                return
+            self._active = False
+            self._stop_event.set()
+            logger.info("Alarm silenced.")
 
-        if self._available:
-            self._gpio.output(config.ALARM_BUZZER_GPIO_PIN, self._gpio.LOW)
-            self._gpio.output(config.ALARM_LED_GPIO_PIN, self._gpio.LOW)
+            if self._available:
+                self._gpio.output(config.ALARM_BUZZER_GPIO_PIN, self._gpio.LOW)
+                self._gpio.output(config.ALARM_LED_GPIO_PIN, self._gpio.LOW)
 
     @property
     def is_active(self) -> bool:
@@ -116,12 +120,16 @@ class AlarmController:
     def _pulse_loop(self) -> None:
         """Toggle buzzer and LED at ~2 Hz until stopped."""
         while not self._stop_event.is_set():
-            self._gpio.output(config.ALARM_BUZZER_GPIO_PIN, self._gpio.HIGH)
-            self._gpio.output(config.ALARM_LED_GPIO_PIN, self._gpio.HIGH)
-            time.sleep(0.25)
-            self._gpio.output(config.ALARM_BUZZER_GPIO_PIN, self._gpio.LOW)
-            self._gpio.output(config.ALARM_LED_GPIO_PIN, self._gpio.LOW)
-            time.sleep(0.25)
+            try:
+                self._gpio.output(config.ALARM_BUZZER_GPIO_PIN, self._gpio.HIGH)
+                self._gpio.output(config.ALARM_LED_GPIO_PIN, self._gpio.HIGH)
+                time.sleep(0.25)
+                self._gpio.output(config.ALARM_BUZZER_GPIO_PIN, self._gpio.LOW)
+                self._gpio.output(config.ALARM_LED_GPIO_PIN, self._gpio.LOW)
+                time.sleep(0.25)
+            except (RuntimeError, AttributeError) as exc:
+                logger.debug("GPIO pulse loop error: %s", exc)
+                break
 
     # ------------------------------------------------------------------
     # Cleanup

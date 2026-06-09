@@ -5,9 +5,11 @@ import logging
 import os
 from typing import Optional
 
+import requests  # type: ignore
+
 logger = logging.getLogger(__name__)
 
-_DEFAULT_OLLAMA_URL = "http://10.0.0.20:11434"
+_DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
 _DEFAULT_MODEL = "gemma2:2b"
 _REQUEST_TIMEOUT = 30  # seconds
 
@@ -19,29 +21,13 @@ class OllamaClient:
 
     def __init__(self, base_url: Optional[str] = None) -> None:
         self.base_url = (
-            base_url
-            or os.environ.get("OLLAMA_BASE_URL", _DEFAULT_OLLAMA_URL)
+            base_url if base_url is not None
+            else os.environ.get("OLLAMA_BASE_URL", _DEFAULT_OLLAMA_URL)
         ).rstrip("/")
 
     # ---------------------------------------------------------------------------
     # Public API
     # ---------------------------------------------------------------------------
-
-    def is_available(self) -> bool:
-        """
-        Perform a lightweight health check against the Ollama server.
-
-        Returns
-        -------
-        True if the server responds with HTTP 200, False otherwise.
-        """
-        try:
-            import requests  # type: ignore
-            resp = requests.get(f"{self.base_url}/api/tags", timeout=5)
-            return resp.status_code == 200
-        except (OSError, ValueError) as exc:
-            logger.debug("Ollama health check failed: %s", exc)
-            return False
 
     def generate(self, prompt: str, model: str = _DEFAULT_MODEL) -> str:
         """
@@ -58,11 +44,7 @@ class OllamaClient:
         -------
         Generated text string, or an error message if Ollama is unavailable.
         """
-        if self.is_available():
-            return self._ollama_generate(prompt, model)
-        return (
-            "AI inference unavailable: Ollama server is unreachable."
-        )
+        return self._ollama_generate(prompt, model)
 
     def analyze_weather(self, telemetry: dict, crop: str = "general") -> str:
         """
@@ -164,7 +146,6 @@ Be specific and practical. Limit response to 250 words."""
     def _ollama_generate(self, prompt: str, model: str) -> str:
         """Send a generation request to the local Ollama server."""
         try:
-            import requests  # type: ignore
             payload = {
                 "model": model,
                 "prompt": prompt,

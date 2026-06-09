@@ -18,6 +18,9 @@ gpiozero>=2.0; platform_machine == "aarch64" or platform_machine == "armv7l"
 # I2C / SMBus (for UV sensor and other I2C peripherals)
 smbus2>=0.4.3
 
+# SPI (for BC Robotics 16CH ADC HAT and other SPI peripherals)
+spidev>=3.6; platform_machine == "aarch64" or platform_machine == "armv7l"
+
 # Pimoroni Enviro+ sensors
 enviroplus>=0.0.6; platform_machine == "aarch64" or platform_machine == "armv7l"
 pimoroni-bme280>=1.0.0; platform_machine == "aarch64" or platform_machine == "armv7l"

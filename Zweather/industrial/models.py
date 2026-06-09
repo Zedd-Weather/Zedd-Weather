@@ -1,9 +1,12 @@
 """
 Industrial data models for Zedd Weather.
 Facility profiles with safe operating conditions, risk thresholds, and process categories.
+Shared region types sourced from global_regions.
 """
 from dataclasses import dataclass, field
 from enum import Enum
+
+from Zweather.global_regions.models import UKRegion, Season, RegionProfile
 
 
 class FacilityCategory(Enum):
@@ -30,6 +33,8 @@ class FacilityProfile:
     # Humidity ranges (%)
     humidity_safe_min: float
     humidity_safe_max: float
+    # Gust limit (stricter for some facilities)
+    wind_gust_halt: float | None = None
     # Precipitation sensitivity
     rain_sensitive: bool = False
     rain_max_mm_hr: float = 10.0
@@ -38,6 +43,8 @@ class FacilityProfile:
     # UV / heat stress for outdoor workers
     uv_caution_threshold: float = 6.0
     uv_halt_threshold: float = 11.0
+    # Visibility (metres)
+    min_visibility_m: float = 50.0
     # AQI thresholds
     aqi_caution: int = 100
     aqi_halt: int = 200
@@ -55,6 +62,7 @@ FACILITY_PROFILES: dict[str, FacilityProfile] = {
         temp_safe_min=5.0, temp_safe_max=38.0,
         temp_halt_min=-10.0, temp_halt_max=45.0,
         wind_max_operational=15.0, wind_halt=25.0,
+        wind_gust_halt=30.0,
         humidity_safe_min=20.0, humidity_safe_max=80.0,
         rain_sensitive=False, rain_max_mm_hr=15.0,
         aqi_caution=100, aqi_halt=200,
@@ -69,6 +77,7 @@ FACILITY_PROFILES: dict[str, FacilityProfile] = {
         temp_safe_min=-15.0, temp_safe_max=42.0,
         temp_halt_min=-25.0, temp_halt_max=48.0,
         wind_max_operational=20.0, wind_halt=30.0,
+        wind_gust_halt=35.0,
         humidity_safe_min=15.0, humidity_safe_max=85.0,
         rain_sensitive=False, rain_max_mm_hr=20.0,
         aqi_caution=150, aqi_halt=250,
@@ -84,10 +93,12 @@ FACILITY_PROFILES: dict[str, FacilityProfile] = {
         temp_safe_min=5.0, temp_safe_max=35.0,
         temp_halt_min=-5.0, temp_halt_max=42.0,
         wind_max_operational=10.0, wind_halt=18.0,
+        wind_gust_halt=22.0,
         humidity_safe_min=25.0, humidity_safe_max=75.0,
         rain_sensitive=True, rain_max_mm_hr=5.0,
         aqi_caution=80, aqi_halt=150,
         equipment_temp_min=0.0, equipment_temp_max=40.0,
+        min_visibility_m=100.0,
         constraints={
             "vapour_dispersion_wind_min_ms": 1.0,
             "static_discharge_humidity_max": 30.0,
@@ -99,6 +110,7 @@ FACILITY_PROFILES: dict[str, FacilityProfile] = {
         temp_safe_min=-5.0, temp_safe_max=40.0,
         temp_halt_min=-20.0, temp_halt_max=45.0,
         wind_max_operational=18.0, wind_halt=25.0,
+        wind_gust_halt=30.0,
         humidity_safe_min=20.0, humidity_safe_max=85.0,
         rain_sensitive=True, rain_max_mm_hr=10.0,
         aqi_caution=100, aqi_halt=200,
@@ -113,6 +125,7 @@ FACILITY_PROFILES: dict[str, FacilityProfile] = {
         temp_safe_min=0.0, temp_safe_max=38.0,
         temp_halt_min=-10.0, temp_halt_max=45.0,
         wind_max_operational=12.0, wind_halt=20.0,
+        wind_gust_halt=25.0,
         humidity_safe_min=20.0, humidity_safe_max=80.0,
         rain_sensitive=True, rain_max_mm_hr=8.0,
         aqi_caution=80, aqi_halt=150,
@@ -128,6 +141,7 @@ FACILITY_PROFILES: dict[str, FacilityProfile] = {
         temp_safe_min=-5.0, temp_safe_max=40.0,
         temp_halt_min=-15.0, temp_halt_max=45.0,
         wind_max_operational=15.0, wind_halt=22.0,
+        wind_gust_halt=27.0,
         humidity_safe_min=15.0, humidity_safe_max=85.0,
         rain_sensitive=False, rain_max_mm_hr=12.0,
         aqi_caution=100, aqi_halt=200,
@@ -157,3 +171,24 @@ class OperationalWindow:
     caution_reasons: list[str]
     recommended_delay_hours: int
     next_check_hours: int
+    region: str | None = None
+    season: str | None = None
+
+
+@dataclass
+class IndustrialHazard:
+    """A single industrial weather hazard."""
+    hazard: str
+    risk_level: str
+    condition: str
+    recommendation: str
+    affected_processes: list[str] | None = None
+
+
+@dataclass
+class MaterialRisk:
+    """A single material/equipment risk from weather conditions."""
+    material: str
+    risk_level: str
+    condition: str
+    recommendation: str

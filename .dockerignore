@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+.github/
+
+# Environment
+.env
+.env.example
+.env.production.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose*.yml
+
+# Docs
+README.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+GOVERNANCE.md
+PRIVACY.md
+RELEASE_POLICY.md
+SECURITY.md
+SUPPORT.md
+
+# License
+LICENSE
+
+# Mosquitto config (not needed in the API/Dash image)
+mosquitto/
+
+# Tests (not needed in production image)
+Zweather/tests/
