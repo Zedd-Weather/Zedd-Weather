@@ -8,6 +8,8 @@ coverage/
 !.env.production.example
 __pycache__/
 *.pyc
+*.zip
+Zedd-Weather-main/
 .pytest_cache/
 .mypy_cache/
 *.nfy0

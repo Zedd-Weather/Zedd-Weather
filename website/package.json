@@ -1,0 +1,14 @@
+{
+  "name": "zedd-weather-site",
+  "version": "1.0.0",
+  "description": "Zedd Weather — static project documentation site (GoDaddy Node.js hosting)",
+  "main": "server.js",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "echo build",
+    "start": "node server.js"
+  }
+}

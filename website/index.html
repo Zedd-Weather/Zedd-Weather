@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Zedd Weather — an edge telemetry and risk-analysis platform for industrial and agricultural monitoring, running on a Raspberry Pi Weather Node cluster with on-device AI." />
+  <meta name="theme-color" content="#0a0a0a" />
+  <title>Zedd Weather — Edge Telemetry &amp; Risk-Analysis Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0a0a'/%3E%3Cpath fill='%2334d399' d='M9 22a7 7 0 0 1-.8-13.96 8.5 8.5 0 0 1 16.3 2.02A6 6 0 0 1 24 22z'/%3E%3C/svg%3E" />
+</head>
+<body>
+
+  <!-- ================================================================
+       Skip link + progress bar
+  ================================================================ -->
+  <a class="skip-link" href="#overview">Skip to content</a>
+  <div id="progress" class="progress-bar" aria-hidden="true"></div>
+
+  <!-- ================================================================
+       Header / Nav
+  ================================================================ -->
+  <header class="site-header" id="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="#top">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="22" height="22" fill="none">
+            <path fill="#34d399" d="M9 22a7 7 0 0 1-.8-13.96 8.5 8.5 0 0 1 16.3 2.02A6 6 0 0 1 24 22z"/>
+          </svg>
+        </span>
+        <span class="brand-text">Zedd&nbsp;Weather</span>
+        <span class="brand-badge">Enterprise</span>
+      </a>
+
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+        <a href="#overview">Overview</a>
+        <a href="#hardware">Hardware</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#features">Features</a>
+        <a href="#sectors">Sectors</a>
+        <a href="#protocol">Protocol</a>
+        <a href="#deploy">Deploy</a>
+      </nav>
+
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <!-- ================================================================
+         Hero
+    ================================================================ -->
+    <section class="hero">
+      <div class="hero-bg" aria-hidden="true">
+        <span class="blob blob-1"></span>
+        <span class="blob blob-2"></span>
+        <span class="blob blob-3"></span>
+      </div>
+      <div class="container hero-inner">
+        <p class="eyebrow reveal">Edge Telemetry &middot; On-Device AI &middot; Blockchain Attestation</p>
+        <h1 class="reveal">Zedd&nbsp;Weather</h1>
+        <p class="hero-tagline reveal">
+          A hardware-first weather automation and environmental attestation platform for
+          <strong>industrial</strong> and <strong>agricultural</strong> monitoring, running as a
+          <strong>PiNet DApp</strong> on a Raspberry&nbsp;Pi Weather&nbsp;Node cluster.
+        </p>
+        <div class="hero-actions reveal">
+          <a class="btn btn-primary" href="#overview">Explore the project</a>
+          <a class="btn btn-ghost" href="#deploy">Quick start</a>
+        </div>
+
+        <div class="hero-stats reveal">
+          <div class="stat"><strong>3</strong><span>Node cluster</span></div>
+          <div class="stat"><strong>3</strong><span>Sector engines</span></div>
+          <div class="stat"><strong>25+</strong><span>Sensor drivers</span></div>
+          <div class="stat"><strong>9</strong><span>Alert rules</span></div>
+          <div class="stat"><strong>4</strong><span>Protocol phases</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         Overview
+    ================================================================ -->
+    <section id="overview" class="section">
+      <div class="container">
+        <p class="kicker">01 &middot; What it is</p>
+        <h2 class="section-title">Overview</h2>
+
+        <div class="grid grid-2">
+          <div class="card reveal">
+            <h3 class="card-title">One line</h3>
+            <p>
+              Zedd Weather is an <strong>edge telemetry and risk-analysis platform</strong> that reads real
+              micro-climate data from Raspberry&nbsp;Pi hardware, runs AI analysis
+              <em>on the device</em>, and turns raw readings into actionable safety,
+              crop, and operations guidance — all while cryptographically attesting each
+              decision to the <strong>Minima blockchain</strong>.
+            </p>
+          </div>
+
+          <div class="card reveal">
+            <h3 class="card-title">The stack, at a glance</h3>
+            <ul class="check-list">
+              <li><strong>Hardware-first</strong> — real Sense HAT, AI HAT+ (Hailo-8L NPU), Enviro+, Modbus sensors</li>
+              <li><strong>On-device AI</strong> — NPU &rarr; Ollama/Gemma &rarr; Gemini fallback chain</li>
+              <li><strong>React 19</strong> dashboard with live telemetry, charts &amp; AI reports</li>
+              <li><strong>FastAPI</strong> backend with sector risk engines &amp; alert rules</li>
+              <li><strong>InfluxDB + Grafana</strong> time-series storage and dashboards</li>
+              <li><strong>MQTT</strong> publish/subscribe between cluster nodes</li>
+              <li><strong>Docker Compose</strong> local stack and 3-node cluster simulation</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="notice reveal">
+          <strong>PiNet OS DApp.</strong>
+          The dashboard also runs as a sandboxed DApp inside the PiNet OS desktop.
+          A typed bridge SDK (<code>src/pinet-sdk.ts</code>) talks to the PiNet host over
+          <code>postMessage</code> for wallet, balance and block events, so the app can
+          participate in the Minima network from within a browser iframe.
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         Hardware
+    ================================================================ -->
+    <section id="hardware" class="section section-alt">
+      <div class="container">
+        <p class="kicker">02 &middot; Physical kit</p>
+        <h2 class="section-title">Hardware</h2>
+        <p class="section-lead">
+          The production Raspberry&nbsp;Pi Weather&nbsp;Node is a sensor-rich board: a Sense&nbsp;HAT v2 for
+          environment readings, an AI&nbsp;HAT+ carrying a Hailo-8L NPU for inference, and an M.2 NVMe
+          SSD for buffering and model storage — extended with GPIO, I2C and Modbus peripherals.
+        </p>
+
+        <div class="grid grid-3">
+          <article class="card card-hw reveal">
+            <div class="hw-icon hw-emerald">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M7 8h10M7 12h6M7 16h9"/></svg>
+            </div>
+            <h3>Sense HAT v2</h3>
+            <p>
+              Environmental + IMU sensors: <strong>temperature</strong> (with CPU-heat compensation),
+              <strong>humidity</strong>, <strong>pressure</strong>, plus orientation — and an
+              8&times;8 RGB <strong>LED matrix</strong> that renders the live risk colour on the device.
+            </p>
+          </article>
+
+          <article class="card card-hw reveal">
+            <div class="hw-icon hw-blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>
+            </div>
+            <h3>AI HAT+ &middot; Hailo-8L NPU</h3>
+            <p>
+              A M.2 Key E <strong>26&nbsp;TOPS</strong> accelerator that runs a compiled
+              <code>weather_classify.hef</code> model on-device — weather classification and
+              anomaly scoring with <strong>no cloud connection</strong>.
+            </p>
+          </article>
+
+          <article class="card card-hw reveal">
+            <div class="hw-icon hw-cyan">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8V6h10v2M12 12v4M10 14h4"/></svg>
+            </div>
+            <h3>M.2 NVMe SSD</h3>
+            <p>
+              Fast local <strong>telemetry buffer</strong> and <strong>model artifact storage</strong>.
+              Keeps the SD card out of the write path and survives broker outages.
+            </p>
+          </article>
+
+          <article class="card card-hw reveal">
+            <div class="hw-icon hw-amber">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="4"/></svg>
+            </div>
+            <h3>VEML6075 UV sensor</h3>
+            <p>
+              I2C UV-A/B radiometer feeding the UV index used by worker-safety and
+              exposure-limit logic across all three sector engines.
+            </p>
+          </article>
+
+          <article class="card card-hw reveal">
+            <div class="hw-icon hw-violet">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a7 7 0 0 1 7 7v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7a7 7 0 0 1 7-7z"/><path d="M10 3.5c.6-.3 1.3-.5 2-.5"/></svg>
+            </div>
+            <h3>Pimoroni Enviro+</h3>
+            <p>
+              Air quality, gas and particulate-matter sensing — provides the
+              <strong>AQI</strong> metric used for respiratory-protection rules.
+            </p>
+          </article>
+
+          <article class="card card-hw reveal">
+            <div class="hw-icon hw-rose">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9h16M4 15h16M7 9V6h10v3M7 15v3h10v-3"/></svg>
+            </div>
+            <h3>GPIO + Modbus RS485</h3>
+            <p>
+              Tipping-bucket <strong>rain gauge</strong> (0.2794&nbsp;mm/tip), buzzer/LED alarm
+              outputs, and Waveshare RS485 CAN HAT for industrial anemometer &amp; rain-gauge units.
+            </p>
+          </article>
+        </div>
+
+        <div class="notice reveal">
+          <strong>Graceful degradation.</strong> Every driver is optional and feature-flagged
+          (<code>SENSE_HAT_ENABLED</code>, <code>ENVIRO_PLUS_ENABLED</code>, <code>MODBUS_ENABLED</code>, …).
+          When hardware is absent, a deterministic simulator oscillates readings so the whole
+          platform still runs end-to-end on any host.
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         Architecture
+    ================================================================ -->
+    <section id="architecture" class="section">
+      <div class="container">
+        <p class="kicker">03 &middot; How it fits together</p>
+        <h2 class="section-title">Architecture</h2>
+        <p class="section-lead">
+          Data flows from real sensors &rarr; MQTT &rarr; AI worker &rarr; storage &rarr; dashboard &amp; ledger.
+          The three-node cluster splits the workloads the same way a physical Raspberry&nbsp;Pi
+          weather network does.
+        </p>
+
+        <div class="pipeline reveal" role="img" aria-label="Data flow diagram">
+          <div class="pipe-node">
+            <span class="pipe-dot dot-emerald"></span>
+            <strong>Node C</strong>
+            <small>Sensory worker</small>
+            <span class="pipe-tag">Sense HAT &middot; Enviro+ &middot; UV &middot; Modbus &middot; MQTT publisher</span>
+          </div>
+          <div class="pipe-arrow" aria-hidden="true">&rarr;</div>
+          <div class="pipe-node">
+            <span class="pipe-dot dot-blue"></span>
+            <strong>Node B</strong>
+            <small>AI worker</small>
+            <span class="pipe-tag">Hailo-8L NPU &rarr; Ollama/Gemma &rarr; Gemini &middot; attestation</span>
+          </div>
+          <div class="pipe-arrow" aria-hidden="true">&rarr;</div>
+          <div class="pipe-node">
+            <span class="pipe-dot dot-amber"></span>
+            <strong>Node A</strong>
+            <small>Control plane + storage</small>
+            <span class="pipe-tag">InfluxDB &middot; Grafana &middot; Open WebUI &middot; FastAPI &middot; React</span>
+          </div>
+        </div>
+
+        <div class="grid grid-3">
+          <article class="card reveal">
+            <h3 class="card-title"><span class="dot-chip chip-emerald">A</span> Control plane + storage</h3>
+            <p>
+              Hosts <strong>InfluxDB 2.7</strong> (time-series telemetry), <strong>Grafana</strong> dashboards,
+              <strong>Open WebUI</strong> (LLM front-end) and the FastAPI backend that powers the React dashboard.
+            </p>
+            <ul class="mini-list">
+              <li>InfluxDB on <code>:8086</code> (org <code>zedd-weather</code>, bucket <code>telemetry</code>)</li>
+              <li>Grafana on <code>:3000</code></li>
+              <li>Open WebUI on <code>:8080</code></li>
+              <li>Vite dev server on <code>:5173</code></li>
+            </ul>
+          </article>
+
+          <article class="card reveal">
+            <h3 class="card-title"><span class="dot-chip chip-blue">B</span> AI worker</h3>
+            <p>
+              Subscribes to MQTT telemetry, ingests <strong>Meteomatics</strong> macro forecasts, and runs
+              inference through the <strong>Hailo-8L NPU</strong> with fallback to local
+              <strong>Ollama / Gemma</strong> and the <strong>Gemini API</strong>.
+            </p>
+            <ul class="mini-list">
+              <li>Cross-references micro &amp; macro weather</li>
+              <li>Generates mitigation directives (e.g. <code>HALT_HEAVY_MACHINERY_HEAT_RISK</code>)</li>
+              <li>SHA-256 attests each directive to the Minima ledger</li>
+            </ul>
+          </article>
+
+          <article class="card reveal">
+            <h3 class="card-title"><span class="dot-chip chip-emerald">C</span> Sensory worker</h3>
+            <p>
+              Aggregates every enabled sensor into one telemetry payload and publishes it to MQTT
+              with <strong>automatic broker failover</strong> and QoS&nbsp;1.
+            </p>
+            <ul class="mini-list">
+              <li>Drives the Sense HAT LED matrix with the live risk colour</li>
+              <li>Evaluates GPIO buzzer/LED alarms from configurable thresholds</li>
+              <li>Buffers locally on NVMe/SQLite during outages</li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="grid grid-3">
+          <article class="card reveal">
+            <h3 class="card-title">Offline resilience</h3>
+            <p>
+              The edge collector writes to <strong>InfluxDB</strong> and, when unreachable, falls back to a
+              <strong>SQLite buffer</strong> (<code>/tmp/zedd_buffer.db</code>) that auto-flushes when
+              connectivity returns. A liveness file (<code>/tmp/zedd-alive</code>) is touched each cycle so
+              container health checks detect hangs.
+            </p>
+          </article>
+          <article class="card reveal">
+            <h3 class="card-title">Anomaly detection</h3>
+            <p>
+              Two-stage validation on every reading:
+            </p>
+            <ol class="mini-list">
+              <li><strong>Physical bounds</strong> — impossible values (e.g. &minus;50&hellip;85&nbsp;&deg;C, 870&hellip;1085&nbsp;hPa) are flagged</li>
+              <li><strong>Z-score</strong> — a rolling 20-point window flags readings &gt; 4&sigma; from the mean</li>
+            </ol>
+            <p>Anomalies are persisted, surfaced as alerts, and excluded from safe-to-proceed logic.</p>
+          </article>
+          <article class="card reveal">
+            <h3 class="card-title">Server-side keys</h3>
+            <p>
+              Google Weather API and Gemini calls are proxied by the FastAPI backend, so
+              <strong>API keys never reach the browser</strong>. The browser only ever talks to
+              <code>/api/&hellip;</code> and public Open-Meteo endpoints.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         Features
+    ================================================================ -->
+    <section id="features" class="section section-alt">
+      <div class="container">
+        <p class="kicker">04 &middot; Capabilities</p>
+        <h2 class="section-title">Features</h2>
+
+        <div class="grid grid-4">
+          <article class="card reveal">
+            <h3 class="card-title">Live telemetry</h3>
+            <p>Real-time temperature, humidity, pressure, precipitation, UV, tide and AQI — from onboard sensors or the external API.</p>
+          </article>
+          <article class="card reveal">
+            <h3 class="card-title">AI risk analysis</h3>
+            <p>Telemetry, forecast, media or site-coordinate analysis that returns a Green/Amber/Red/Black risk level plus a Markdown mitigation report.</p>
+          </article>
+          <article class="card reveal">
+            <h3 class="card-title">Site map &amp; logistics</h3>
+            <p>Grounded Gemini output listing nearby emergency services and hardware sourcing with verified map links.</p>
+          </article>
+          <article class="card reveal">
+            <h3 class="card-title">Forecast grounding</h3>
+            <p>7-day forecast analysed per sector for upcoming hazards, with a one-click “Analyze” button.</p>
+          </article>
+          <article class="card reveal">
+            <h3 class="card-title">Sharding locker</h3>
+            <p>AI directives are split into content shards, hashed, stored in <code>localStorage</code>, and exportable/importable as JSON.</p>
+          </article>
+          <article class="card reveal">
+            <h3 class="card-title">Sector intelligence</h3>
+            <p>Three heuristic engines — construction, agricultural, industrial — turn the same telemetry into sector-specific guidance.</p>
+          </article>
+          <article class="card reveal">
+            <h3 class="card-title">Alerts &amp; sound</h3>
+            <p>Threshold-driven alerts with severity badges, toast notifications, and a Web Audio siren for critical conditions.</p>
+          </article>
+          <article class="card reveal">
+            <h3 class="card-title">Historical trends</h3>
+            <p>7/14/30-day charts with CSV export and per-metric selection.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         Sectors
+    ================================================================ -->
+    <section id="sectors" class="section">
+      <div class="container">
+        <p class="kicker">05 &middot; Domain engines</p>
+        <h2 class="section-title">Sector intelligence</h2>
+        <p class="section-lead">
+          One telemetry snapshot, three lenses. Each engine is a deterministic, rule-based
+          <em>heuristic</em> — no ML libraries required — so it runs anywhere and is fully auditable.
+        </p>
+
+        <div class="tabs reveal" data-tabs>
+          <div class="tab-list" role="tablist">
+            <button class="tab-btn is-active" role="tab" aria-selected="true" data-tab="construction">Construction</button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="agricultural">Agricultural</button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="industrial">Industrial</button>
+          </div>
+
+          <!-- Construction -->
+          <div class="tab-panel is-active" role="tabpanel" data-panel="construction">
+            <div class="grid grid-2">
+              <div class="card">
+                <h3 class="card-title">What it outputs</h3>
+                <ul class="mini-list">
+                  <li><strong>Worker safety</strong> — WBGT-inspired heat index, wind-chill, work&harr;rest ratio, hydration (L/hr), PPE list</li>
+                  <li><strong>Work window</strong> — safe-to-proceed flag with halt/caution reasons, delay &amp; next-check hours</li>
+                  <li><strong>Weather hazards</strong> — wind, lightning/storm, heat, cold, rain with mitigations</li>
+                  <li><strong>Material risks</strong> — concrete curing, steel condensation/ice, paint adhesion, timber moisture</li>
+                </ul>
+              </div>
+              <div class="card">
+                <h3 class="card-title">Key thresholds</h3>
+                <ul class="mini-list">
+                  <li>Wind: caution 10 m/s &middot; halt 18 m/s</li>
+                  <li>Heat: caution 30&nbsp;&deg;C &middot; extreme 40&nbsp;&deg;C</li>
+                  <li>Cold: caution 5&nbsp;&deg;C &middot; extreme &minus;10&nbsp;&deg;C</li>
+                  <li>Storm risk below 995 hPa (+ humidity &gt; 75%)</li>
+                  <li>Rothfusz heat-index &amp; North-American wind-chill formulas</li>
+                </ul>
+              </div>
+            </div>
+            <div class="notice">
+              Example directive: <code>HALT: Wind speed 19.2 m/s exceeds halt limit (18.0 m/s).</code>
+              &mdash; with an immediate “secure crane and elevated work” mitigation.
+            </div>
+          </div>
+
+          <!-- Agricultural -->
+          <div class="tab-panel" role="tabpanel" data-panel="agricultural">
+            <div class="grid grid-2">
+              <div class="card">
+                <h3 class="card-title">What it outputs</h3>
+                <ul class="mini-list">
+                  <li><strong>Soil moisture</strong> — estimated VWC % (Hargreaves-style ET proxy), confidence, days-to-irrigation</li>
+                  <li><strong>Irrigation schedule</strong> — recommended / urgency / volume (mm) / next check</li>
+                  <li><strong>Pest risk</strong> — spider mites, aphids/whiteflies, locusts, stem borers</li>
+                  <li><strong>Disease risk</strong> — late blight, powdery mildew, Botrytis, leaf scorch</li>
+                  <li><strong>Weather stress</strong> — heat, cold, frost, humidity, pressure alerts</li>
+                </ul>
+              </div>
+              <div class="card">
+                <h3 class="card-title">Crop profiles</h3>
+                <p>
+                  Per-crop optima (temp, humidity, water requirement, frost-kill temperature)
+                  for maize and other crops drive irrigation and stress decisions.
+                </p>
+                <ul class="mini-list">
+                  <li>High humidity &gt;80% &rarr; fungal risk; &lt;35% &rarr; mite risk</li>
+                  <li>Frost-kill detection escalates to critical</li>
+                  <li>Rainfall &gt; 1.5&times; daily need cancels irrigation</li>
+                </ul>
+              </div>
+            </div>
+            <div class="notice">
+              Example directive: <code>FROST RISK: Protect crops with frost cloth or smudge pots immediately.</code>
+            </div>
+          </div>
+
+          <!-- Industrial -->
+          <div class="tab-panel" role="tabpanel" data-panel="industrial">
+            <div class="grid grid-2">
+              <div class="card">
+                <h3 class="card-title">What it outputs</h3>
+                <ul class="mini-list">
+                  <li><strong>Equipment safety</strong> — thermal-stress and corrosion-risk indices, ventilation flag</li>
+                  <li><strong>Operational window</strong> — safe-to-operate with halt/caution reasons</li>
+                  <li><strong>Process risks</strong> — equipment overheating/cold start, static discharge, vapour accumulation, AQI exposure</li>
+                  <li><strong>PPE</strong> — respiratory protection (P2/N95) when AQI rises; chemical PPE for chemical/refinery sites</li>
+                </ul>
+              </div>
+              <div class="card">
+                <h3 class="card-title">Facility-specific logic</h3>
+                <ul class="mini-list">
+                  <li>Wind: caution 12 m/s &middot; halt 22 m/s</li>
+                  <li><code>chemical</code>/<code>refinery</code>: static-discharge &amp; vapour-dispersion rules</li>
+                  <li>AQI halt/caution thresholds from facility profile</li>
+                  <li>Logistics disruption when rainfall &gt; 10 mm</li>
+                </ul>
+              </div>
+            </div>
+            <div class="notice">
+              Example directive: <code>Static Discharge: Low humidity (22%) increases electrostatic discharge risk — activate humidification and enforce grounding.</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         Risk & Alerts
+    ================================================================ -->
+    <section class="section section-alt">
+      <div class="container">
+        <p class="kicker">06 &middot; Safety layers</p>
+        <h2 class="section-title">Risk levels &amp; alert rules</h2>
+
+        <div class="grid grid-2">
+          <div class="card reveal">
+            <h3 class="card-title">Risk scale</h3>
+            <p>The AI layer reports a four-colour risk level used across the dashboard and directives:</p>
+            <div class="risk-scale">
+              <span class="risk-pill risk-green">Green <small>Low risk</small></span>
+              <span class="risk-pill risk-amber">Amber <small>Elevated</small></span>
+              <span class="risk-pill risk-red">Red <small>High risk</small></span>
+              <span class="risk-pill risk-black">Black <small>Full shutdown</small></span>
+            </div>
+            <p class="muted">The heuristic sector engines use a parallel low &rarr; medium &rarr; high &rarr; critical scale.</p>
+          </div>
+
+          <div class="card reveal">
+            <h3 class="card-title">Default alert rules</h3>
+            <table class="data-table">
+              <thead>
+                <tr><th>Rule</th><th>Metric</th><th>Condition</th><th>Severity</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Extreme Heat</td><td>temp</td><td>&gt; 40&deg;C</td><td class="sev-crit">Critical</td></tr>
+                <tr><td>Frost Risk</td><td>temp</td><td>&lt; 2&deg;C</td><td class="sev-crit">Critical</td></tr>
+                <tr><td>Very High Humidity</td><td>humidity</td><td>&ge; 90%</td><td class="sev-crit">Critical</td></tr>
+                <tr><td>Storm Pressure</td><td>pressure</td><td>&lt; 980 hPa</td><td class="sev-crit">Critical</td></tr>
+                <tr><td>High Temperature</td><td>temp</td><td>&gt; 35&deg;C</td><td class="sev-warn">Warning</td></tr>
+                <tr><td>Low Temperature</td><td>temp</td><td>&lt; 8&deg;C</td><td class="sev-warn">Warning</td></tr>
+                <tr><td>High Humidity</td><td>humidity</td><td>&gt; 80%</td><td class="sev-warn">Warning</td></tr>
+                <tr><td>Low Humidity</td><td>humidity</td><td>&lt; 30%</td><td class="sev-warn">Warning</td></tr>
+                <tr><td>Low Pressure</td><td>pressure</td><td>&lt; 995 hPa</td><td class="sev-warn">Warning</td></tr>
+              </tbody>
+            </table>
+            <p class="muted">Custom rules are supported via <code>AlertRulesEngine.add_rule()</code>. Alerts sort critical-first.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         Sovereign Protocol
+    ================================================================ -->
+    <section id="protocol" class="section">
+      <div class="container">
+        <p class="kicker">07 &middot; On-chain attestation</p>
+        <h2 class="section-title">RMPE-2 sovereign weather protocol</h2>
+        <p class="section-lead">
+          Every weather observation, policy evaluation and mitigation directive can be committed to the
+          <strong>Minima blockchain</strong> as a <em>weather coin</em>. The sovereign engine composes and
+          validates deterministic state transitions entirely from <code>PREVSTATE</code> plus cryptographic proofs.
+        </p>
+
+        <div class="grid grid-2">
+          <div class="card reveal">
+            <h3 class="card-title">Weather coin state</h3>
+            <ul class="mini-list">
+              <li><strong>Protocol tag</strong> — <code>RMPE2-WEATHER</code></li>
+              <li><strong>Oracle root</strong> — committed Merkle root of the weather dataset</li>
+              <li><strong>Phases</strong> — <code>data_entry &rarr; consensus &rarr; distribution &rarr; settlement</code></li>
+              <li><strong>Recursive layers</strong> — station identity, geo-fencing, policy, settlement</li>
+              <li><strong>Budget</strong> — max depth 8, max proof 2048 bytes (256 bytes/depth)</li>
+            </ul>
+          </div>
+
+          <div class="card reveal">
+            <h3 class="card-title">What validation guarantees</h3>
+            <ul class="mini-list">
+              <li>Station identity and oracle root are stable across transitions</li>
+              <li>Weather timestamp and usage counter strictly increase (no oracle overuse)</li>
+              <li>Sequence advances one step; phases are linear and unskippable</li>
+              <li>Each recursive branch is preceded by an <code>ASSERT PROOF</code> membership proof</li>
+              <li>Proofs fit a bounded byte budget; RMP root must recompute from leaf + path</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card reveal">
+          <h3 class="card-title">Network peer exchange — RNPE-2</h3>
+          <p>
+            Nodes reconcile consensus with peers through <strong>Recursive Network Peer Exchange</strong>:
+            missing block ranges must be height-contiguous and hash-linked, must start from the local tip,
+            and must terminate at the advertised consensus tip whose state root matches the recursive Merkle proof.
+            Compatibility tooling exposes this via <code>/api/sovereign/protocol</code>,
+            <code>/api/sovereign/compose</code> and <code>/api/sovereign/validate</code>.
+          </p>
+        </div>
+
+        <div class="card reveal">
+          <h3 class="card-title">Attestation flow</h3>
+          <ol class="mini-list">
+            <li>Sensors publish telemetry over MQTT (Node C)</li>
+            <li>AI worker runs inference and generates a mitigation directive (Node B)</li>
+            <li>Directive is SHA-256 hashed into an attestation record (<code>Minima-Zedd-v1</code>)</li>
+            <li>The dashboard splits directives into shards, stores/export them, and displays verified ledger attestations</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         AI chain
+    ================================================================ -->
+    <section class="section section-alt">
+      <div class="container">
+        <p class="kicker">08 &middot; Inference</p>
+        <h2 class="section-title">The AI fallback chain</h2>
+        <p class="section-lead">
+          Inference is designed to <strong>keep working offline</strong>. Each tier is tried in order, and the
+          whole stack degrades gracefully to rule-based heuristics.
+        </p>
+
+        <div class="grid grid-4">
+          <article class="card reveal">
+            <h3 class="card-title"><span class="dot-chip chip-emerald">1</span> Hailo-8L NPU</h3>
+            <p>Loads the HEF model at startup and keeps it resident on the NPU for low-latency weather classification (clear, cloudy, rain, storm, fog, snow).</p>
+          </article>
+          <article class="card reveal">
+            <h3 class="card-title"><span class="dot-chip chip-blue">2</span> Ollama / Gemma</h3>
+            <p>Local <code>gemma2:2b</code> over <code>OLLAMA_BASE_URL</code> produces structured JSON risk reports — no cloud required.</p>
+          </article>
+          <article class="card reveal">
+            <h3 class="card-title"><span class="dot-chip chip-amber">3</span> Gemini API</h3>
+            <p>Cloud fallback for richer telemetry/media/forecast/map analysis, grounded with Google Maps retrieval.</p>
+          </article>
+          <article class="card reveal">
+            <h3 class="card-title"><span class="dot-chip chip-rose">4</span> Heuristic fallback</h3>
+            <p>Deterministic rules (temp/humidity/pressure thresholds) classify weather when every AI tier is unavailable.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         API
+    ================================================================ -->
+    <section class="section">
+      <div class="container">
+        <p class="kicker">09 &middot; HTTP surface</p>
+        <h2 class="section-title">API reference</h2>
+        <p class="section-lead">
+          FastAPI (uvicorn on <code>:8000</code>) exposes the sector engines, alert rules, weather proxy,
+          AI analysis and sovereign protocol. All secrets stay server-side.
+        </p>
+
+        <div class="api-group reveal">
+          <h3 class="group-title">Sector &amp; alerts</h3>
+          <div class="endpoint"><code class="method post">POST</code><code>/api/analyze</code><span>Run construction / agricultural / industrial risk analysis on telemetry</span></div>
+          <div class="endpoint"><code class="method post">POST</code><code>/api/alerts</code><span>Evaluate alert rules against a telemetry snapshot</span></div>
+          <div class="endpoint"><code class="method get">GET</code><code>/api/health</code><span>Service health check with version + timestamp</span></div>
+        </div>
+
+        <div class="api-group reveal">
+          <h3 class="group-title">Sensor telemetry</h3>
+          <div class="endpoint"><code class="method post">POST</code><code>/api/telemetry/ingest</code><span>Accept a snapshot from a sensor node / MQTT bridge (202 Accepted)</span></div>
+          <div class="endpoint"><code class="method get">GET</code><code>/api/telemetry/latest</code><span>Latest onboard-sensor snapshot for the dashboard</span></div>
+        </div>
+
+        <div class="api-group reveal">
+          <h3 class="group-title">Weather (Google Weather API proxy)</h3>
+          <div class="endpoint"><code class="method get">GET</code><code>/api/weather/current?lat=&amp;lng=</code><span>Current conditions + 24 h hourly forecast</span></div>
+          <div class="endpoint"><code class="method get">GET</code><code>/api/weather/forecast?lat=&amp;lng=&amp;days=</code><span>Multi-day daily forecast (1&ndash;10 days)</span></div>
+          <div class="endpoint"><code class="method get">GET</code><code>/api/weather/history?lat=&amp;lng=&amp;days=</code><span>Historical hourly data (1&ndash;30 days)</span></div>
+        </div>
+
+        <div class="api-group reveal">
+          <h3 class="group-title">AI (local Ollama / Gemma)</h3>
+          <div class="endpoint"><code class="method post">POST</code><code>/api/ai/risk</code><span>AI risk report on live telemetry &rarr; {riskLevel, report}</span></div>
+          <div class="endpoint"><code class="method post">POST</code><code>/api/ai/forecast</code><span>AI analysis of a 7-day forecast</span></div>
+          <div class="endpoint"><code class="method post">POST</code><code>/api/ai/sitemap</code><span>Site logistics report from coordinates</span></div>
+        </div>
+
+        <div class="api-group reveal">
+          <h3 class="group-title">Sovereign RMPE-2 protocol</h3>
+          <div class="endpoint"><code class="method get">GET</code><code>/api/sovereign/protocol</code><span>Protocol tag, phases, depth/proof limits, compatibility endpoints</span></div>
+          <div class="endpoint"><code class="method post">POST</code><code>/api/sovereign/compose</code><span>Compose a weather-coin transition from operator inputs</span></div>
+          <div class="endpoint"><code class="method post">POST</code><code>/api/sovereign/validate</code><span>Validate a transition from PREVSTATE + proofs</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         Tech stack
+    ================================================================ -->
+    <section class="section section-alt">
+      <div class="container">
+        <p class="kicker">10 &middot; Tooling</p>
+        <h2 class="section-title">Tech stack</h2>
+
+        <div class="grid grid-2">
+          <div class="card reveal">
+            <h3 class="card-title">Frontend</h3>
+            <div class="chip-row">
+              <span class="chip">React 19</span><span class="chip">Vite 6</span><span class="chip">TypeScript 5.8</span>
+              <span class="chip">Tailwind CSS 4</span><span class="chip">Recharts</span><span class="chip">React Markdown</span>
+              <span class="chip">Sonner</span><span class="chip">Lucide icons</span><span class="chip">Google GenAI SDK</span>
+              <span class="chip">Motion</span>
+            </div>
+            <p class="muted">Runs as a PiNet DApp via <code>src/pinet-sdk.ts</code> (postMessage bridge to PiNet OS).</p>
+          </div>
+
+          <div class="card reveal">
+            <h3 class="card-title">Backend &amp; data</h3>
+            <div class="chip-row">
+              <span class="chip">Python 3</span><span class="chip">FastAPI</span><span class="chip">Uvicorn</span>
+              <span class="chip">Pydantic</span><span class="chip">aiohttp</span><span class="chip">paho-mqtt</span>
+              <span class="chip">InfluxDB 2.7</span><span class="chip">Grafana 11</span><span class="chip">SQLite</span>
+              <span class="chip">Open WebUI</span><span class="chip">Mosquitto</span>
+            </div>
+            <p class="muted">Docker Compose for the local stack and a 3-node cluster simulation.</p>
+          </div>
+        </div>
+
+        <div class="card reveal">
+          <h3 class="card-title">Repository layout</h3>
+          <pre class="code-block"><code>.
+├── docker-compose.yml             # Core stack (control plane + storage workloads)
+├── docker-compose.cluster.yml     # 3-node simulation (AI + sensory workers + MQTT)
+├── Dockerfile                     # Multi-arch (arm64/v8) container image
+├── Zweather/                      # Python services
+│   ├── api.py                     # FastAPI REST surface
+│   ├── app.py                     # Edge collector (Sense HAT &rarr; InfluxDB + buffer)
+│   ├── ai_client.py               # Ollama/Gemma server-side AI
+│   ├── weather_client.py          # Google Weather API proxy
+│   ├── construction/ agricultural/ industrial/   # Sector engines
+│   ├── alerting/                  # Alert rules engine
+│   ├── sovereign/                 # RMPE-2 weather-coin protocol
+│   ├── node1_telemetry/           # Sensory worker (sensors, MQTT, HAT control)
+│   ├── node2_orchestration/       # AI worker (inference + attestation)
+│   ├── ollama_inference/          # Hailo NPU client + Ollama client
+│   └── tests/                     # pytest suite
+├── src/                           # React frontend (Vite + React 19 + TS)
+├── mosquitto/                     # MQTT broker config
+├── public/                        # Vite static assets + dapp.json
+└── .github/workflows/             # CI: lint, test, build, multi-arch image</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         Deployment
+    ================================================================ -->
+    <section id="deploy" class="section">
+      <div class="container">
+        <p class="kicker">11 &middot; Run it</p>
+        <h2 class="section-title">Deployment &amp; quick start</h2>
+
+        <div class="grid grid-2">
+          <div class="card reveal">
+            <h3 class="card-title">Local stack</h3>
+            <pre class="code-block"><code>cp .env.example .env
+# set INFLUXDB_TOKEN (and GEMINI_API_KEY optionally)
+
+# Control plane + storage (Node A workloads)
+docker compose up -d
+
+# Add AI + sensory workers + MQTT (Nodes B &amp; C simulation)
+docker compose -f docker-compose.yml \
+  -f docker-compose.cluster.yml up -d --build</code></pre>
+            <ul class="mini-list">
+              <li>InfluxDB &rarr; <code>localhost:8086</code> &middot; Grafana &rarr; <code>localhost:3000</code></li>
+              <li>Open WebUI &rarr; <code>localhost:8080</code> &middot; MQTT &rarr; <code>1883</code></li>
+            </ul>
+          </div>
+
+          <div class="card reveal">
+            <h3 class="card-title">Frontend dev</h3>
+            <pre class="code-block"><code>npm install
+npm run dev   # Vite on http://localhost:5173
+
+# checks
+npm run lint  # tsc --noEmit
+npm run build # vite build → dist/</code></pre>
+            <p class="muted">Production build output lands in <code>dist/</code> and can be served by any static host.</p>
+          </div>
+        </div>
+
+        <div class="card reveal">
+          <h3 class="card-title">Three-node cluster test</h3>
+          <div class="grid grid-2">
+            <div>
+              <h4>Single-host simulation</h4>
+              <pre class="code-block"><code>docker compose -f docker-compose.yml \
+  -f docker-compose.cluster.yml up -d
+
+docker exec zedd-mqtt mosquitto_sub \
+  -t 'weather_station/#' -v
+docker logs -f zedd-sensory-worker
+docker logs -f zedd-ai-worker</code></pre>
+            </div>
+            <div>
+              <h4>Real multi-host (3 Pis)</h4>
+              <ul class="mini-list">
+                <li><strong>Node A</strong> (control + storage): <code>docker compose up -d</code></li>
+                <li><strong>Node B</strong> (AI): <code>MQTT_BROKER_HOST=&lt;node-a-ip&gt; docker compose -f docker-compose.cluster.yml up -d ai-worker mqtt-broker</code></li>
+                <li><strong>Node C</strong> (sensory): <code>MQTT_BROKER_HOST=&lt;node-a-ip&gt; docker compose -f docker-compose.cluster.yml up -d sensory-worker mqtt-broker</code></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card reveal">
+          <h3 class="card-title">Key environment variables</h3>
+          <table class="data-table">
+            <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>MQTT_BROKER_HOST</code></td><td><code>mqtt-broker</code></td><td>Broker hostname/IP</td></tr>
+              <tr><td><code>MQTT_TOPIC</code></td><td><code>weather_station/telemetry</code></td><td>Telemetry topic</td></tr>
+              <tr><td><code>SENSE_HAT_ENABLED</code></td><td><code>true</code></td><td>Use real Sense HAT</td></tr>
+              <tr><td><code>AI_HAT_ENABLED</code></td><td><code>true</code></td><td>Enable Hailo-8L NPU</td></tr>
+              <tr><td><code>AI_HAT_MODEL_PATH</code></td><td><code>/opt/zedd/models/weather_classify.hef</code></td><td>Compiled HEF model</td></tr>
+              <tr><td><code>M2_NVME_ENABLED</code></td><td><code>false</code></td><td>Use NVMe telemetry buffer</td></tr>
+              <tr><td><code>PUBLISH_INTERVAL</code></td><td><code>10.0</code></td><td>Seconds between readings</td></tr>
+              <tr><td><code>OLLAMA_BASE_URL</code></td><td><code>http://127.0.0.1:11434</code></td><td>Local LLM endpoint</td></tr>
+              <tr><td><code>GOOGLE_WEATHER_API_KEY</code></td><td><em>—</em></td><td>Server-side weather proxy key</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card reveal">
+          <h3 class="card-title">CI / CD</h3>
+          <p>GitHub Actions runs, on every push and PR:</p>
+          <div class="chip-row">
+            <span class="chip">flake8</span><span class="chip">mypy</span><span class="chip">pytest</span>
+            <span class="chip">tsc --noEmit</span><span class="chip">vite build</span><span class="chip">multi-arch Docker build</span>
+          </div>
+          <p class="muted">Python tests cover the API, alert rules, all three sector engines, forecasting, the sovereign protocol, and the telemetry buffer.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         Hosting note
+    ================================================================ -->
+    <section class="section section-alt">
+      <div class="container">
+        <p class="kicker">12 &middot; About this site</p>
+        <h2 class="section-title">Hosting on GoDaddy</h2>
+        <div class="grid grid-2">
+          <div class="card reveal">
+            <h3 class="card-title">This page</h3>
+            <p>
+              This site is <strong>100% static</strong> — plain HTML, CSS and JavaScript with no build step,
+              no Node server and no database. Upload the contents of the <code>website/</code> folder to your
+              GoDaddy hosting root and it works immediately.
+            </p>
+          </div>
+          <div class="card reveal">
+            <h3 class="card-title">Where the code lives</h3>
+            <p>
+              Zedd Weather is MIT-licensed and developed openly with contribution,
+              security and governance guidelines. See <code>README.md</code>, <code>CONTRIBUTING.md</code>,
+              <code>SECURITY.md</code> and <code>GOVERNANCE.md</code> in the repository root.
+            </p>
+          </div>
+        </div>
+        <div class="notice reveal">
+          <strong>Tip:</strong> to serve the production dashboard (<code>dist/</code>) from GoDaddy instead of a
+          live backend, host it as a static build and point the FastAPI endpoints at your own deployed API —
+          or run the full stack on a VPS with Docker Compose.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================================================================
+       Footer
+  ================================================================ -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="20" height="20" fill="none">
+            <path fill="#34d399" d="M9 22a7 7 0 0 1-.8-13.96 8.5 8.5 0 0 1 16.3 2.02A6 6 0 0 1 24 22z"/>
+          </svg>
+        </span>
+        <strong>Zedd Weather</strong>
+      </div>
+      <p class="footer-note">
+        Edge telemetry &middot; on-device AI &middot; blockchain-attested weather automation &middot; MIT License
+      </p>
+      <p class="footer-small">
+        Raspberry Pi Weather Node &middot; PiNet DApp &middot; Minima &middot; React &middot; FastAPI &middot; InfluxDB &middot; Grafana
+      </p>
+    </div>
+  </footer>
+
+  <button class="to-top" id="to-top" aria-label="Back to top">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+  </button>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
